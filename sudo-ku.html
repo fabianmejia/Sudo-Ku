@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    :root {
+        --bg: #111214;
+        --panel: #191b1f;
+        --panel2: #202328;
+        --cell: #181a1e;
+        --cell-related: #292d33;
+        --cell-selected: #3a3f47;
+        --cell-match: #34302a;
+
+        --given: #d9dde4;
+        --text: #e8eaed;
+        --muted: #7f858f;
+
+        --accent: #d98b3a;
+        --correct: #74c69d;
+        --wrong: #e06c75;
+
+        --border: #3b3f46;
+        --major-border: #777d87;
+    }
+
+    body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+
+        font-family:
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
+
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .game {
+        width: min(94vw, 560px);
+        padding: 24px 16px 28px;
+    }
+
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+    }
+
+    h1 {
+        font-size: 26px;
+        margin: 0;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    .difficulty {
+        display: flex;
+        gap: 5px;
+        background: var(--panel);
+        padding: 4px;
+        border-radius: 8px;
+    }
+
+    .difficulty button {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        padding: 6px 9px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+
+    .difficulty button.active {
+        background: var(--accent);
+        color: #111;
+    }
+
+    .info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .mistakes {
+        color: var(--wrong);
+        opacity: 0;
+        transition: opacity .2s;
+    }
+
+    .mistakes.visible {
+        opacity: 1;
+    }
+
+    .board {
+        width: min(92vw, 520px);
+        aspect-ratio: 1;
+        margin: auto;
+
+        display: grid;
+        grid-template-columns: repeat(9, 1fr);
+        grid-template-rows: repeat(9, 1fr);
+
+        background: var(--major-border);
+        border: 2px solid var(--major-border);
+        gap: 1px;
+    }
+
+    .cell {
+        position: relative;
+        min-width: 0;
+        min-height: 0;
+
+        background: var(--cell);
+
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        cursor: pointer;
+        user-select: none;
+
+        transition:
+            background-color 0.08s ease,
+            box-shadow 0.08s ease;
+    }
+
+    /*
+     * Row / column of selected cell.
+     *
+     * This deliberately does NOT include the 3x3 box.
+     */
+    .cell.line-related {
+        background: var(--cell-related);
+    }
+
+    /*
+     * Currently selected cell.
+     */
+    .cell.selected {
+        background: var(--cell-selected);
+    }
+
+    /*
+     * Same correct number as the selected cell.
+     */
+    .cell.number-match {
+        background: var(--cell-match);
+    }
+
+    /*
+     * Make the selected matching number especially obvious.
+     */
+    .cell.selected.number-match {
+        background: var(--cell-selected);
+        box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
+    .cell.given {
+        color: var(--given);
+        font-weight: 600;
+    }
+
+    .cell.correct {
+        color: var(--correct);
+        font-weight: 600;
+        cursor: default;
+    }
+
+    .cell.wrong {
+        color: var(--wrong);
+        font-weight: 600;
+    }
+
+    /* 3x3 box boundaries */
+
+    .cell:nth-child(3n) {
+        border-right: 2px solid var(--major-border);
+    }
+
+    .cell:nth-child(9n) {
+        border-right: 0;
+    }
+
+    .cell:nth-child(n+19):nth-child(-n+27),
+    .cell:nth-child(n+46):nth-child(-n+54) {
+        border-bottom: 2px solid var(--major-border);
+    }
+
+    .value {
+        font-size: clamp(22px, 6vw, 34px);
+        line-height: 1;
+        position: relative;
+        z-index: 2;
+    }
+
+    /*
+     * Candidate grid.
+     *
+     * The numbers themselves are only inserted when the
+     * user has explicitly added that candidate.
+     */
+    .candidates {
+        position: absolute;
+        inset: 3px;
+
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+
+        pointer-events: none;
+    }
+
+    .candidate {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        color: #aeb4bd;
+        font-size: clamp(7px, 1.8vw, 11px);
+        line-height: 1;
+    }
+
+    .controls {
+        margin-top: 18px;
+    }
+
+    .mode {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .mode button,
+    .action {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 7px;
+        padding: 9px 14px;
+        cursor: pointer;
+    }
+
+    .mode button.active {
+        background: var(--accent);
+        color: #111;
+        border-color: var(--accent);
+    }
+
+    .number-pad {
+        display: grid;
+        grid-template-columns: repeat(9, 1fr);
+        gap: 6px;
+    }
+
+    .number-pad button {
+        height: 42px;
+
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+
+        border-radius: 6px;
+        font-size: 17px;
+        cursor: pointer;
+    }
+
+    .number-pad button:hover,
+    .action:hover,
+    .mode button:hover {
+        background: var(--panel2);
+    }
+
+    .number-pad button.active-number {
+        background: var(--accent);
+        color: #111;
+        border-color: var(--accent);
+    }
+
+    .bottom-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 12px;
+    }
+
+    .action {
+        min-width: 100px;
+    }
+
+    .message {
+        text-align: center;
+        min-height: 22px;
+        margin-top: 12px;
+
+        font-size: 14px;
+        color: var(--muted);
+    }
+
+    .message.success {
+        color: var(--correct);
+    }
+
+    .message.error {
+        color: var(--wrong);
+    }
+
+    @media (max-width: 420px) {
+
+        .game {
+            padding: 15px 8px 20px;
+        }
+
+        header {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .number-pad {
+            gap: 4px;
+        }
+
+        .number-pad button {
+            height: 38px;
+        }
+    }
+</style>
+</head>
+
+<body>
+
+<div class="game">
+
+    <header>
+        <h1>Sudoku</h1>
+
+        <div class="difficulty">
+            <button data-difficulty="easy">Easy</button>
+            <button data-difficulty="medium" class="active">Medium</button>
+            <button data-difficulty="hard">Hard</button>
+            <button data-difficulty="expert">Expert</button>
+        </div>
+    </header>
+
+    <div class="info">
+        <span id="status">Medium</span>
+        <span id="mistakes" class="mistakes">Mistakes: 0</span>
+    </div>
+
+    <div id="board" class="board"></div>
+
+    <div class="controls">
+
+        <div class="mode">
+            <button id="normalMode" class="active">Number</button>
+            <button id="candidateMode">Candidates</button>
+        </div>
+
+        <div id="numberPad" class="number-pad"></div>
+
+        <div class="bottom-actions">
+            <button class="action" id="erase">Erase</button>
+            <button class="action" id="newGame">New Game</button>
+            <button class="action" id="check">Check</button>
+        </div>
+
+        <div id="message" class="message"></div>
+
+    </div>
+
+</div>
+
+<script>
+"use strict";
+
+const boardElement = document.getElementById("board");
+const numberPad = document.getElementById("numberPad");
+const messageElement = document.getElementById("message");
+const mistakesElement = document.getElementById("mistakes");
+const statusElement = document.getElementById("status");
+
+const normalModeButton =
+    document.getElementById("normalMode");
+
+const candidateModeButton =
+    document.getElementById("candidateMode");
+
+let solution = [];
+let puzzle = [];
+let cells = [];
+
+let selected = -1;
+let mode = "number";
+let difficulty = "medium";
+let mistakes = 0;
+let gameFinished = false;
+
+
+/* -----------------------------------------------------------
+   Utility
+----------------------------------------------------------- */
+
+function shuffle(array) {
+
+    const a = [...array];
+
+    for (let i = a.length - 1; i > 0; i--) {
+
+        const j =
+            Math.floor(Math.random() * (i + 1));
+
+        [a[i], a[j]] =
+            [a[j], a[i]];
+    }
+
+    return a;
+}
+
+
+function index(row, col) {
+    return row * 9 + col;
+}
+
+
+function rowOf(i) {
+    return Math.floor(i / 9);
+}
+
+
+function colOf(i) {
+    return i % 9;
+}
+
+
+function boxOf(i) {
+
+    return (
+        Math.floor(rowOf(i) / 3) * 3 +
+        Math.floor(colOf(i) / 3)
+    );
+}
+
+
+/* -----------------------------------------------------------
+   Sudoku solver
+----------------------------------------------------------- */
+
+function isValid(board, pos, num) {
+
+    const row = rowOf(pos);
+    const col = colOf(pos);
+
+    const boxRow =
+        Math.floor(row / 3) * 3;
+
+    const boxCol =
+        Math.floor(col / 3) * 3;
+
+
+    for (let c = 0; c < 9; c++) {
+
+        if (board[index(row, c)] === num) {
+            return false;
+        }
+    }
+
+
+    for (let r = 0; r < 9; r++) {
+
+        if (board[index(r, col)] === num) {
+            return false;
+        }
+    }
+
+
+    for (let r = boxRow; r < boxRow + 3; r++) {
+
+        for (let c = boxCol; c < boxCol + 3; c++) {
+
+            if (board[index(r, c)] === num) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+
+function solve(board) {
+
+    let bestPos = -1;
+    let bestCandidates = null;
+
+
+    for (let i = 0; i < 81; i++) {
+
+        if (board[i] !== 0) {
+            continue;
+        }
+
+
+        const candidates = [];
+
+
+        for (let n = 1; n <= 9; n++) {
+
+            if (isValid(board, i, n)) {
+                candidates.push(n);
+            }
+        }
+
+
+        if (candidates.length === 0) {
+            return false;
+        }
+
+
+        if (
+            bestCandidates === null ||
+            candidates.length < bestCandidates.length
+        ) {
+
+            bestCandidates = candidates;
+            bestPos = i;
+
+            if (candidates.length === 1) {
+                break;
+            }
+        }
+    }
+
+
+    if (bestPos === -1) {
+        return true;
+    }
+
+
+    for (const n of shuffle(bestCandidates)) {
+
+        board[bestPos] = n;
+
+        if (solve(board)) {
+            return true;
+        }
+
+        board[bestPos] = 0;
+    }
+
+    return false;
+}
+
+
+function generateSolution() {
+
+    const board =
+        Array(81).fill(0);
+
+    solve(board);
+
+    return board;
+}
+
+
+function countSolutions(board, limit = 2) {
+
+    let count = 0;
+
+
+    function search() {
+
+        if (count >= limit) {
+            return;
+        }
+
+
+        let bestPos = -1;
+        let bestCandidates = null;
+
+
+        for (let i = 0; i < 81; i++) {
+
+            if (board[i] !== 0) {
+                continue;
+            }
+
+
+            const candidates = [];
+
+
+            for (let n = 1; n <= 9; n++) {
+
+                if (isValid(board, i, n)) {
+                    candidates.push(n);
+                }
+            }
+
+
+            if (candidates.length === 0) {
+                return;
+            }
+
+
+            if (
+                bestCandidates === null ||
+                candidates.length < bestCandidates.length
+            ) {
+
+                bestCandidates = candidates;
+                bestPos = i;
+            }
+        }
+
+
+        if (bestPos === -1) {
+
+            count++;
+            return;
+        }
+
+
+        for (const n of bestCandidates) {
+
+            board[bestPos] = n;
+
+            search();
+
+            if (count >= limit) {
+
+                board[bestPos] = 0;
+                return;
+            }
+        }
+
+        board[bestPos] = 0;
+    }
+
+
+    search();
+
+    return count;
+}
+
+
+function generatePuzzle() {
+
+    solution =
+        generateSolution();
+
+    puzzle =
+        [...solution];
+
+
+    const targets = {
+        easy: 40,
+        medium: 48,
+        hard: 54,
+        expert: 59
+    };
+
+
+    const targetRemoved =
+        targets[difficulty];
+
+
+    const positions =
+        shuffle([...Array(81).keys()]);
+
+
+    let removed = 0;
+
+
+    for (const pos of positions) {
+
+        if (removed >= targetRemoved) {
+            break;
+        }
+
+
+        const old =
+            puzzle[pos];
+
+        puzzle[pos] = 0;
+
+
+        const test =
+            [...puzzle];
+
+
+        if (countSolutions(test, 2) !== 1) {
+
+            puzzle[pos] = old;
+
+        } else {
+
+            removed++;
+        }
+    }
+}
+
+
+/* -----------------------------------------------------------
+   Game state
+----------------------------------------------------------- */
+
+function createCells() {
+
+    cells = [];
+
+
+    for (let i = 0; i < 81; i++) {
+
+        cells.push({
+
+            value: puzzle[i],
+
+            given:
+                puzzle[i] !== 0,
+
+            locked:
+                puzzle[i] !== 0,
+
+            candidates:
+                new Set(),
+
+            element:
+                null
+        });
+    }
+}
+
+
+function sameRow(a, b) {
+    return rowOf(a) === rowOf(b);
+}
+
+
+function sameColumn(a, b) {
+    return colOf(a) === colOf(b);
+}
+
+
+/* -----------------------------------------------------------
+   Rendering
+----------------------------------------------------------- */
+
+function renderBoard() {
+
+    boardElement.innerHTML = "";
+
+
+    for (let i = 0; i < 81; i++) {
+
+        const cell =
+            document.createElement("div");
+
+        cell.className = "cell";
+
+
+        const value =
+            document.createElement("div");
+
+        value.className = "value";
+
+
+        const candidates =
+            document.createElement("div");
+
+        candidates.className = "candidates";
+
+
+        for (let n = 1; n <= 9; n++) {
+
+            const candidate =
+                document.createElement("div");
+
+            candidate.className =
+                "candidate";
+
+            candidate.dataset.number =
+                n;
+
+            /*
+             * IMPORTANT:
+             *
+             * No number is placed here initially.
+             * Candidates will only be given text
+             * when the user actually adds one.
+             */
+            candidate.textContent = "";
+
+            candidates.appendChild(candidate);
+        }
+
+
+        cell.appendChild(value);
+        cell.appendChild(candidates);
+
+
+        cell.addEventListener("click", () => {
+
+            selectCell(i);
+        });
+
+
+        cells[i].element =
+            cell;
+
+        boardElement.appendChild(cell);
+    }
+
+
+    updateBoard();
+}
+
+
+/* -----------------------------------------------------------
+   Board update
+----------------------------------------------------------- */
+
+function updateBoard() {
+
+    let selectedIsCorrect = false;
+    let selectedValue = 0;
+
+
+    /*
+     * Determine whether the selected cell contains
+     * a correct number.
+     */
+    if (selected !== -1) {
+
+        const selectedCell =
+            cells[selected];
+
+        selectedValue =
+            selectedCell.value;
+
+        selectedIsCorrect =
+            selectedValue !== 0 &&
+            selectedValue === solution[selected];
+    }
+
+
+    for (let i = 0; i < 81; i++) {
+
+        const state =
+            cells[i];
+
+        const element =
+            state.element;
+
+
+        /*
+         * Selected cell
+         */
+        element.classList.toggle(
+            "selected",
+            i === selected
+        );
+
+
+        /*
+         * Selected row and column.
+         *
+         * Notice that this intentionally does NOT
+         * include the selected cell's 3x3 box.
+         */
+        const lineRelated =
+            selected !== -1 &&
+            i !== selected &&
+            (
+                sameRow(i, selected) ||
+                sameColumn(i, selected)
+            );
+
+
+        element.classList.toggle(
+            "line-related",
+            lineRelated
+        );
+
+
+        /*
+         * Highlight every correct occurrence of
+         * the selected number.
+         *
+         * This only happens when the selected number
+         * itself is correct.
+         */
+        const numberMatch =
+            selectedIsCorrect &&
+            i !== selected &&
+            state.value === selectedValue &&
+            state.value === solution[i];
+
+
+        element.classList.toggle(
+            "number-match",
+            numberMatch
+        );
+
+
+        element.classList.toggle(
+            "given",
+            state.given
+        );
+
+
+        element.classList.toggle(
+            "correct",
+            state.locked && !state.given
+        );
+
+
+        element.classList.toggle(
+            "wrong",
+            !state.locked &&
+            !state.given &&
+            state.value !== 0 &&
+            state.value !== solution[i]
+        );
+
+
+        /*
+         * Main number
+         */
+        const valueElement =
+            element.querySelector(".value");
+
+
+        valueElement.textContent =
+            state.value === 0
+                ? ""
+                : state.value;
+
+
+        /*
+         * Candidates
+         *
+         * Only candidates explicitly entered by
+         * the player are shown.
+         */
+        const candidateElements =
+            element.querySelectorAll(".candidate");
+
+
+        candidateElements.forEach(candidate => {
+
+            const n =
+                Number(candidate.dataset.number);
+
+            const active =
+                state.candidates.has(n);
+
+
+            candidate.textContent =
+                active ? n : "";
+
+
+            candidate.classList.toggle(
+                "active",
+                active
+            );
+        });
+    }
+
+
+    updateNumberPad();
+}
+
+
+/* -----------------------------------------------------------
+   Selection
+----------------------------------------------------------- */
+
+function selectCell(i) {
+
+    if (gameFinished) {
+        return;
+    }
+
+
+    selected = i;
+
+    updateBoard();
+}
+
+
+/* -----------------------------------------------------------
+   Candidate handling
+----------------------------------------------------------- */
+
+function toggleCandidate(number) {
+
+    if (selected === -1) {
+        return;
+    }
+
+
+    const cell =
+        cells[selected];
+
+
+    if (cell.locked || cell.given) {
+        return;
+    }
+
+
+    if (cell.value !== 0) {
+        return;
+    }
+
+
+    if (cell.candidates.has(number)) {
+
+        cell.candidates.delete(number);
+
+    } else {
+
+        cell.candidates.add(number);
+    }
+
+
+    updateBoard();
+}
+
+
+/*
+ * Remove a candidate from cells sharing the same
+ * row, column, or box as the correctly solved cell.
+ */
+function removeCandidateFromPeers(pos, number) {
+
+    const row = rowOf(pos);
+    const col = colOf(pos);
+    const box = boxOf(pos);
+
+
+    for (let i = 0; i < 81; i++) {
+
+        if (i === pos) {
+            continue;
+        }
+
+
+        if (
+            rowOf(i) === row ||
+            colOf(i) === col ||
+            boxOf(i) === box
+        ) {
+
+            cells[i].candidates.delete(number);
+        }
+    }
+}
+
+
+/* -----------------------------------------------------------
+   Number placement
+----------------------------------------------------------- */
+
+function placeNumber(number) {
+
+    if (
+        selected === -1 ||
+        gameFinished
+    ) {
+        return;
+    }
+
+
+    const cell =
+        cells[selected];
+
+
+    /*
+     * Correct numbers and given numbers
+     * are permanently locked.
+     */
+    if (
+        cell.locked ||
+        cell.given
+    ) {
+        return;
+    }
+
+
+    /*
+     * Candidate mode
+     */
+    if (mode === "candidate") {
+
+        toggleCandidate(number);
+        return;
+    }
+
+
+    /*
+     * Clicking the same number again erases
+     * it, unless it has already become locked.
+     */
+    if (cell.value === number) {
+
+        cell.value = 0;
+
+        updateBoard();
+
+        return;
+    }
+
+
+    cell.candidates.clear();
+
+    cell.value = number;
+
+
+    /*
+     * Correct immediately:
+     * lock it permanently.
+     */
+    if (
+        number === solution[selected]
+    ) {
+
+        cell.locked = true;
+
+
+        removeCandidateFromPeers(
+            selected,
+            number
+        );
+
+
+        checkWin();
+
+
+    } else {
+
+        /*
+         * Incorrect values remain editable.
+         */
+        mistakes++;
+
+
+        mistakesElement.textContent =
+            "Mistakes: " + mistakes;
+
+
+        mistakesElement.classList.add(
+            "visible"
+        );
+    }
+
+
+    updateBoard();
+}
+
+
+/* -----------------------------------------------------------
+   Erase
+----------------------------------------------------------- */
+
+function eraseSelected() {
+
+    if (
+        selected === -1 ||
+        gameFinished
+    ) {
+        return;
+    }
+
+
+    const cell =
+        cells[selected];
+
+
+    if (
+        cell.locked ||
+        cell.given
+    ) {
+        return;
+    }
+
+
+    cell.value = 0;
+    cell.candidates.clear();
+
+
+    updateBoard();
+}
+
+
+/* -----------------------------------------------------------
+   Check / win
+----------------------------------------------------------- */
+
+function checkWin() {
+
+    for (let i = 0; i < 81; i++) {
+
+        if (
+            cells[i].value !==
+            solution[i]
+        ) {
+
+            return false;
+        }
+    }
+
+
+    gameFinished = true;
+
+
+    messageElement.textContent =
+        "Puzzle solved!";
+
+
+    messageElement.className =
+        "message success";
+
+
+    return true;
+}
+
+
+function checkBoard() {
+
+    let incorrect = 0;
+    let incomplete = 0;
+
+
+    for (let i = 0; i < 81; i++) {
+
+        const cell =
+            cells[i];
+
+
+        if (cell.value === 0) {
+
+            incomplete++;
+            continue;
+        }
+
+
+        if (
+            cell.value !==
+            solution[i]
+        ) {
+
+            incorrect++;
+        }
+    }
+
+
+    if (incorrect > 0) {
+
+        messageElement.textContent =
+            incorrect === 1
+                ? "There is 1 incorrect number."
+                : `There are ${incorrect} incorrect numbers.`;
+
+
+        messageElement.className =
+            "message error";
+
+
+    } else if (incomplete > 0) {
+
+        messageElement.textContent =
+            `${incomplete} cells remaining.`;
+
+
+        messageElement.className =
+            "message";
+
+
+    } else {
+
+        checkWin();
+    }
+}
+
+
+/* -----------------------------------------------------------
+   New game
+----------------------------------------------------------- */
+
+function newGame() {
+
+    gameFinished = false;
+    selected = -1;
+    mistakes = 0;
+
+
+    mistakesElement.textContent =
+        "Mistakes: 0";
+
+
+    mistakesElement.classList.remove(
+        "visible"
+    );
+
+
+    messageElement.textContent = "";
+
+
+    messageElement.className =
+        "message";
+
+
+    statusElement.textContent =
+        difficulty.charAt(0).toUpperCase() +
+        difficulty.slice(1);
+
+
+    generatePuzzle();
+
+    createCells();
+
+    renderBoard();
+}
+
+
+/* -----------------------------------------------------------
+   Mode
+----------------------------------------------------------- */
+
+normalModeButton.addEventListener(
+    "click",
+    () => {
+
+        mode = "number";
+
+        normalModeButton.classList.add(
+            "active"
+        );
+
+        candidateModeButton.classList.remove(
+            "active"
+        );
+    }
+);
+
+
+candidateModeButton.addEventListener(
+    "click",
+    () => {
+
+        mode = "candidate";
+
+        candidateModeButton.classList.add(
+            "active"
+        );
+
+        normalModeButton.classList.remove(
+            "active"
+        );
+    }
+);
+
+
+/* -----------------------------------------------------------
+   Difficulty
+----------------------------------------------------------- */
+
+document
+    .querySelectorAll("[data-difficulty]")
+    .forEach(button => {
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                difficulty =
+                    button.dataset.difficulty;
+
+
+                document
+                    .querySelectorAll(
+                        "[data-difficulty]"
+                    )
+                    .forEach(b =>
+                        b.classList.remove(
+                            "active"
+                        )
+                    );
+
+
+                button.classList.add(
+                    "active"
+                );
+
+
+                newGame();
+            }
+        );
+    });
+
+
+/* -----------------------------------------------------------
+   Number pad
+----------------------------------------------------------- */
+
+for (let n = 1; n <= 9; n++) {
+
+    const button =
+        document.createElement("button");
+
+
+    button.textContent = n;
+
+    button.dataset.number = n;
+
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            placeNumber(n);
+        }
+    );
+
+
+    numberPad.appendChild(button);
+}
+
+
+/* -----------------------------------------------------------
+   Buttons
+----------------------------------------------------------- */
+
+document
+    .getElementById("erase")
+    .addEventListener(
+        "click",
+        eraseSelected
+    );
+
+
+document
+    .getElementById("newGame")
+    .addEventListener(
+        "click",
+        newGame
+    );
+
+
+document
+    .getElementById("check")
+    .addEventListener(
+        "click",
+        checkBoard
+    );
+
+
+/* -----------------------------------------------------------
+   Keyboard
+----------------------------------------------------------- */
+
+document.addEventListener(
+    "keydown",
+    event => {
+
+        if (gameFinished) {
+            return;
+        }
+
+
+        /*
+         * Number keys
+         */
+        if (
+            event.key >= "1" &&
+            event.key <= "9"
+        ) {
+
+            placeNumber(
+                Number(event.key)
+            );
+
+            return;
+        }
+
+
+        /*
+         * Erase
+         */
+        if (
+            event.key === "Backspace" ||
+            event.key === "Delete" ||
+            event.key === "0"
+        ) {
+
+            eraseSelected();
+
+            return;
+        }
+
+
+        if (selected === -1) {
+            return;
+        }
+
+
+        let row =
+            rowOf(selected);
+
+        let col =
+            colOf(selected);
+
+
+        switch (event.key) {
+
+            case "ArrowUp":
+                row = Math.max(
+                    0,
+                    row - 1
+                );
+                break;
+
+            case "ArrowDown":
+                row = Math.min(
+                    8,
+                    row + 1
+                );
+                break;
+
+            case "ArrowLeft":
+                col = Math.max(
+                    0,
+                    col - 1
+                );
+                break;
+
+            case "ArrowRight":
+                col = Math.min(
+                    8,
+                    col + 1
+                );
+                break;
+
+            default:
+                return;
+        }
+
+
+        event.preventDefault();
+
+
+        selectCell(
+            index(row, col)
+        );
+    }
+);
+
+
+/* -----------------------------------------------------------
+   Start
+----------------------------------------------------------- */
+
+newGame();
+
+</script>
+
+</body>
+</html>
