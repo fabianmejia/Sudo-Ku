@@ -14,6 +14,7 @@
         --bg: #111214;
         --panel: #191b1f;
         --panel2: #202328;
+
         --cell: #181a1e;
         --cell-related: #292d33;
         --cell-selected: #3a3f47;
@@ -26,6 +27,9 @@
         --accent: #d98b3a;
         --correct: #74c69d;
         --wrong: #e06c75;
+
+        --candidate-highlight: #34383f;
+        --candidate-border: #5b616b;
 
         --border: #3b3f46;
         --major-border: #777d87;
@@ -144,9 +148,8 @@
     }
 
     /*
-     * Row / column of selected cell.
-     *
-     * This deliberately does NOT include the 3x3 box.
+     * Selected cell's row and column.
+     * Deliberately excludes the 3x3 box.
      */
     .cell.line-related {
         background: var(--cell-related);
@@ -160,14 +163,16 @@
     }
 
     /*
-     * Same correct number as the selected cell.
+     * Other correct cells containing the same
+     * correct number as the selected cell.
      */
     .cell.number-match {
         background: var(--cell-match);
     }
 
     /*
-     * Make the selected matching number especially obvious.
+     * Selected cell gets a stronger border when
+     * it is also a matching correct number.
      */
     .cell.selected.number-match {
         background: var(--cell-selected);
@@ -190,7 +195,9 @@
         font-weight: 600;
     }
 
-    /* 3x3 box boundaries */
+    /*
+     * 3x3 box boundaries
+     */
 
     .cell:nth-child(3n) {
         border-right: 2px solid var(--major-border);
@@ -205,6 +212,13 @@
         border-bottom: 2px solid var(--major-border);
     }
 
+    .cell:nth-child(n+55):nth-child(-n+63) {
+        border-bottom: 2px solid var(--major-border);
+    }
+
+    /*
+     * Main cell number.
+     */
     .value {
         font-size: clamp(22px, 6vw, 34px);
         line-height: 1;
@@ -215,12 +229,11 @@
     /*
      * Candidate grid.
      *
-     * The numbers themselves are only inserted when the
-     * user has explicitly added that candidate.
+     * It occupies the entire cell.
      */
     .candidates {
         position: absolute;
-        inset: 3px;
+        inset: 0;
 
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -229,14 +242,21 @@
         pointer-events: none;
     }
 
+    /*
+     * Candidate numbers are intentionally large.
+     */
     .candidate {
         display: flex;
         align-items: center;
         justify-content: center;
 
         color: #aeb4bd;
-        font-size: clamp(7px, 1.8vw, 11px);
-        line-height: 1;
+
+        font-size: clamp(11px, 3vw, 17px);
+        line-height: 0.8;
+        font-weight: 500;
+
+        transform: scale(1.05);
     }
 
     .controls {
@@ -282,6 +302,11 @@
         border-radius: 6px;
         font-size: 17px;
         cursor: pointer;
+
+        transition:
+            background-color 0.08s ease,
+            border-color 0.08s ease,
+            color 0.08s ease;
     }
 
     .number-pad button:hover,
@@ -290,7 +315,29 @@
         background: var(--panel2);
     }
 
+    /*
+     * Actual number currently present in the selected cell.
+     */
     .number-pad button.active-number {
+        background: var(--accent);
+        color: #111;
+        border-color: var(--accent);
+    }
+
+    /*
+     * Candidate currently written in the selected cell.
+     */
+    .number-pad button.candidate-number {
+        background: var(--candidate-highlight);
+        border-color: var(--candidate-border);
+        color: #ffffff;
+    }
+
+    /*
+     * Actual selected value takes precedence over
+     * candidate highlighting.
+     */
+    .number-pad button.active-number.candidate-number {
         background: var(--accent);
         color: #111;
         border-color: var(--accent);
@@ -371,16 +418,31 @@
     <div class="controls">
 
         <div class="mode">
-            <button id="normalMode" class="active">Number</button>
-            <button id="candidateMode">Candidates</button>
+            <button id="normalMode" class="active">
+                Number
+            </button>
+
+            <button id="candidateMode">
+                Candidates
+            </button>
         </div>
 
         <div id="numberPad" class="number-pad"></div>
 
         <div class="bottom-actions">
-            <button class="action" id="erase">Erase</button>
-            <button class="action" id="newGame">New Game</button>
-            <button class="action" id="check">Check</button>
+
+            <button class="action" id="erase">
+                Erase
+            </button>
+
+            <button class="action" id="newGame">
+                New Game
+            </button>
+
+            <button class="action" id="check">
+                Check
+            </button>
+
         </div>
 
         <div id="message" class="message"></div>
@@ -392,11 +454,25 @@
 <script>
 "use strict";
 
-const boardElement = document.getElementById("board");
-const numberPad = document.getElementById("numberPad");
-const messageElement = document.getElementById("message");
-const mistakesElement = document.getElementById("mistakes");
-const statusElement = document.getElementById("status");
+
+/* -----------------------------------------------------------
+   DOM
+----------------------------------------------------------- */
+
+const boardElement =
+    document.getElementById("board");
+
+const numberPad =
+    document.getElementById("numberPad");
+
+const messageElement =
+    document.getElementById("message");
+
+const mistakesElement =
+    document.getElementById("mistakes");
+
+const statusElement =
+    document.getElementById("status");
 
 const normalModeButton =
     document.getElementById("normalMode");
@@ -404,14 +480,23 @@ const normalModeButton =
 const candidateModeButton =
     document.getElementById("candidateMode");
 
+
+/* -----------------------------------------------------------
+   Game state
+----------------------------------------------------------- */
+
 let solution = [];
 let puzzle = [];
 let cells = [];
 
 let selected = -1;
+
 let mode = "number";
+
 let difficulty = "medium";
+
 let mistakes = 0;
+
 let gameFinished = false;
 
 
@@ -423,10 +508,16 @@ function shuffle(array) {
 
     const a = [...array];
 
-    for (let i = a.length - 1; i > 0; i--) {
+    for (
+        let i = a.length - 1;
+        i > 0;
+        i--
+    ) {
 
         const j =
-            Math.floor(Math.random() * (i + 1));
+            Math.floor(
+                Math.random() * (i + 1)
+            );
 
         [a[i], a[j]] =
             [a[j], a[i]];
@@ -461,7 +552,7 @@ function boxOf(i) {
 
 
 /* -----------------------------------------------------------
-   Sudoku solver
+   Sudoku validation / solver
 ----------------------------------------------------------- */
 
 function isValid(board, pos, num) {
@@ -476,27 +567,47 @@ function isValid(board, pos, num) {
         Math.floor(col / 3) * 3;
 
 
+    /* Row */
+
     for (let c = 0; c < 9; c++) {
 
-        if (board[index(row, c)] === num) {
+        if (
+            board[index(row, c)] === num
+        ) {
             return false;
         }
     }
 
+
+    /* Column */
 
     for (let r = 0; r < 9; r++) {
 
-        if (board[index(r, col)] === num) {
+        if (
+            board[index(r, col)] === num
+        ) {
             return false;
         }
     }
 
 
-    for (let r = boxRow; r < boxRow + 3; r++) {
+    /* 3x3 box */
 
-        for (let c = boxCol; c < boxCol + 3; c++) {
+    for (
+        let r = boxRow;
+        r < boxRow + 3;
+        r++
+    ) {
 
-            if (board[index(r, c)] === num) {
+        for (
+            let c = boxCol;
+            c < boxCol + 3;
+            c++
+        ) {
+
+            if (
+                board[index(r, c)] === num
+            ) {
                 return false;
             }
         }
@@ -524,7 +635,9 @@ function solve(board) {
 
         for (let n = 1; n <= 9; n++) {
 
-            if (isValid(board, i, n)) {
+            if (
+                isValid(board, i, n)
+            ) {
                 candidates.push(n);
             }
         }
@@ -537,7 +650,8 @@ function solve(board) {
 
         if (
             bestCandidates === null ||
-            candidates.length < bestCandidates.length
+            candidates.length <
+            bestCandidates.length
         ) {
 
             bestCandidates = candidates;
@@ -555,16 +669,21 @@ function solve(board) {
     }
 
 
-    for (const n of shuffle(bestCandidates)) {
+    for (
+        const n of shuffle(bestCandidates)
+    ) {
 
         board[bestPos] = n;
+
 
         if (solve(board)) {
             return true;
         }
 
+
         board[bestPos] = 0;
     }
+
 
     return false;
 }
@@ -581,7 +700,10 @@ function generateSolution() {
 }
 
 
-function countSolutions(board, limit = 2) {
+function countSolutions(
+    board,
+    limit = 2
+) {
 
     let count = 0;
 
@@ -609,7 +731,10 @@ function countSolutions(board, limit = 2) {
 
             for (let n = 1; n <= 9; n++) {
 
-                if (isValid(board, i, n)) {
+                if (
+                    isValid(board, i, n)
+                ) {
+
                     candidates.push(n);
                 }
             }
@@ -622,7 +747,8 @@ function countSolutions(board, limit = 2) {
 
             if (
                 bestCandidates === null ||
-                candidates.length < bestCandidates.length
+                candidates.length <
+                bestCandidates.length
             ) {
 
                 bestCandidates = candidates;
@@ -638,11 +764,14 @@ function countSolutions(board, limit = 2) {
         }
 
 
-        for (const n of bestCandidates) {
+        for (
+            const n of bestCandidates
+        ) {
 
             board[bestPos] = n;
 
             search();
+
 
             if (count >= limit) {
 
@@ -650,6 +779,7 @@ function countSolutions(board, limit = 2) {
                 return;
             }
         }
+
 
         board[bestPos] = 0;
     }
@@ -661,6 +791,10 @@ function countSolutions(board, limit = 2) {
 }
 
 
+/* -----------------------------------------------------------
+   Puzzle generation
+----------------------------------------------------------- */
+
 function generatePuzzle() {
 
     solution =
@@ -671,6 +805,7 @@ function generatePuzzle() {
 
 
     const targets = {
+
         easy: 40,
         medium: 48,
         hard: 54,
@@ -683,21 +818,28 @@ function generatePuzzle() {
 
 
     const positions =
-        shuffle([...Array(81).keys()]);
+        shuffle(
+            [...Array(81).keys()]
+        );
 
 
     let removed = 0;
 
 
-    for (const pos of positions) {
+    for (
+        const pos of positions
+    ) {
 
-        if (removed >= targetRemoved) {
+        if (
+            removed >= targetRemoved
+        ) {
             break;
         }
 
 
         const old =
             puzzle[pos];
+
 
         puzzle[pos] = 0;
 
@@ -706,7 +848,9 @@ function generatePuzzle() {
             [...puzzle];
 
 
-        if (countSolutions(test, 2) !== 1) {
+        if (
+            countSolutions(test, 2) !== 1
+        ) {
 
             puzzle[pos] = old;
 
@@ -719,7 +863,7 @@ function generatePuzzle() {
 
 
 /* -----------------------------------------------------------
-   Game state
+   Cell state
 ----------------------------------------------------------- */
 
 function createCells() {
@@ -749,6 +893,10 @@ function createCells() {
 }
 
 
+/* -----------------------------------------------------------
+   Row / column relationships
+----------------------------------------------------------- */
+
 function sameRow(a, b) {
     return rowOf(a) === rowOf(b);
 }
@@ -759,8 +907,23 @@ function sameColumn(a, b) {
 }
 
 
+function sameBox(a, b) {
+    return boxOf(a) === boxOf(b);
+}
+
+
+function relatedCells(a, b) {
+
+    return (
+        sameRow(a, b) ||
+        sameColumn(a, b) ||
+        sameBox(a, b)
+    );
+}
+
+
 /* -----------------------------------------------------------
-   Rendering
+   Board creation
 ----------------------------------------------------------- */
 
 function renderBoard() {
@@ -776,16 +939,23 @@ function renderBoard() {
         cell.className = "cell";
 
 
+        /*
+         * Main displayed value
+         */
         const value =
             document.createElement("div");
 
         value.className = "value";
 
 
+        /*
+         * Candidate mini-grid
+         */
         const candidates =
             document.createElement("div");
 
-        candidates.className = "candidates";
+        candidates.className =
+            "candidates";
 
 
         for (let n = 1; n <= 9; n++) {
@@ -801,10 +971,8 @@ function renderBoard() {
 
             /*
              * IMPORTANT:
-             *
-             * No number is placed here initially.
-             * Candidates will only be given text
-             * when the user actually adds one.
+             * Candidate numbers start empty.
+             * They only appear when explicitly entered.
              */
             candidate.textContent = "";
 
@@ -816,14 +984,13 @@ function renderBoard() {
         cell.appendChild(candidates);
 
 
-        cell.addEventListener("click", () => {
+        cell.addEventListener(
+            "click",
+            () => selectCell(i)
+        );
 
-            selectCell(i);
-        });
 
-
-        cells[i].element =
-            cell;
+        cells[i].element = cell;
 
         boardElement.appendChild(cell);
     }
@@ -844,7 +1011,7 @@ function updateBoard() {
 
 
     /*
-     * Determine whether the selected cell contains
+     * Determine whether the selected cell has
      * a correct number.
      */
     if (selected !== -1) {
@@ -852,8 +1019,10 @@ function updateBoard() {
         const selectedCell =
             cells[selected];
 
+
         selectedValue =
             selectedCell.value;
+
 
         selectedIsCorrect =
             selectedValue !== 0 &&
@@ -880,10 +1049,7 @@ function updateBoard() {
 
 
         /*
-         * Selected row and column.
-         *
-         * Notice that this intentionally does NOT
-         * include the selected cell's 3x3 box.
+         * Selected row / column
          */
         const lineRelated =
             selected !== -1 &&
@@ -901,11 +1067,7 @@ function updateBoard() {
 
 
         /*
-         * Highlight every correct occurrence of
-         * the selected number.
-         *
-         * This only happens when the selected number
-         * itself is correct.
+         * Same correct number
          */
         const numberMatch =
             selectedIsCorrect &&
@@ -920,18 +1082,28 @@ function updateBoard() {
         );
 
 
+        /*
+         * Given puzzle number
+         */
         element.classList.toggle(
             "given",
             state.given
         );
 
 
+        /*
+         * Correct player number
+         */
         element.classList.toggle(
             "correct",
-            state.locked && !state.given
+            state.locked &&
+            !state.given
         );
 
 
+        /*
+         * Incorrect editable number
+         */
         element.classList.toggle(
             "wrong",
             !state.locked &&
@@ -956,36 +1128,101 @@ function updateBoard() {
 
         /*
          * Candidates
-         *
-         * Only candidates explicitly entered by
-         * the player are shown.
          */
         const candidateElements =
-            element.querySelectorAll(".candidate");
-
-
-        candidateElements.forEach(candidate => {
-
-            const n =
-                Number(candidate.dataset.number);
-
-            const active =
-                state.candidates.has(n);
-
-
-            candidate.textContent =
-                active ? n : "";
-
-
-            candidate.classList.toggle(
-                "active",
-                active
+            element.querySelectorAll(
+                ".candidate"
             );
-        });
+
+
+        candidateElements.forEach(
+            candidate => {
+
+                const n =
+                    Number(
+                        candidate.dataset.number
+                    );
+
+
+                const active =
+                    state.candidates.has(n);
+
+
+                /*
+                 * ONLY explicitly entered
+                 * candidates get text.
+                 */
+                candidate.textContent =
+                    active ? n : "";
+
+
+                candidate.classList.toggle(
+                    "active",
+                    active
+                );
+            }
+        );
     }
 
 
     updateNumberPad();
+}
+
+
+/* -----------------------------------------------------------
+   Number pad update
+----------------------------------------------------------- */
+
+function updateNumberPad() {
+
+    /*
+     * Actual number currently in selected cell.
+     */
+    const selectedValue =
+        selected >= 0
+            ? cells[selected].value
+            : 0;
+
+
+    /*
+     * Candidates explicitly entered into
+     * the selected cell.
+     */
+    const selectedCandidates =
+        selected >= 0
+            ? cells[selected].candidates
+            : new Set();
+
+
+    document
+        .querySelectorAll(
+            ".number-pad button"
+        )
+        .forEach(button => {
+
+            const n =
+                Number(
+                    button.dataset.number
+                );
+
+
+            /*
+             * Actual cell value
+             */
+            button.classList.toggle(
+                "active-number",
+                n === selectedValue
+            );
+
+
+            /*
+             * Candidate in selected cell
+             */
+            button.classList.toggle(
+                "candidate-number",
+                selectedCandidates.has(n)
+            );
+        });
 }
 
 
@@ -1021,17 +1258,29 @@ function toggleCandidate(number) {
         cells[selected];
 
 
-    if (cell.locked || cell.given) {
+    /*
+     * Locked / given cells cannot have candidates.
+     */
+    if (
+        cell.locked ||
+        cell.given
+    ) {
         return;
     }
 
 
+    /*
+     * Candidates are only allowed in
+     * an otherwise empty cell.
+     */
     if (cell.value !== 0) {
         return;
     }
 
 
-    if (cell.candidates.has(number)) {
+    if (
+        cell.candidates.has(number)
+    ) {
 
         cell.candidates.delete(number);
 
@@ -1045,11 +1294,14 @@ function toggleCandidate(number) {
 }
 
 
-/*
- * Remove a candidate from cells sharing the same
- * row, column, or box as the correctly solved cell.
- */
-function removeCandidateFromPeers(pos, number) {
+/* -----------------------------------------------------------
+   Candidate removal after correct placement
+----------------------------------------------------------- */
+
+function removeCandidateFromPeers(
+    pos,
+    number
+) {
 
     const row = rowOf(pos);
     const col = colOf(pos);
@@ -1069,7 +1321,9 @@ function removeCandidateFromPeers(pos, number) {
             boxOf(i) === box
         ) {
 
-            cells[i].candidates.delete(number);
+            cells[i].candidates.delete(
+                number
+            );
         }
     }
 }
@@ -1094,8 +1348,7 @@ function placeNumber(number) {
 
 
     /*
-     * Correct numbers and given numbers
-     * are permanently locked.
+     * Correct and given numbers are locked.
      */
     if (
         cell.locked ||
@@ -1111,15 +1364,18 @@ function placeNumber(number) {
     if (mode === "candidate") {
 
         toggleCandidate(number);
+
         return;
     }
 
 
     /*
-     * Clicking the same number again erases
-     * it, unless it has already become locked.
+     * Clicking the current editable number
+     * again erases it.
      */
-    if (cell.value === number) {
+    if (
+        cell.value === number
+    ) {
 
         cell.value = 0;
 
@@ -1129,14 +1385,16 @@ function placeNumber(number) {
     }
 
 
+    /*
+     * Enter number.
+     */
     cell.candidates.clear();
 
     cell.value = number;
 
 
     /*
-     * Correct immediately:
-     * lock it permanently.
+     * Correct number becomes permanently locked.
      */
     if (
         number === solution[selected]
@@ -1157,7 +1415,7 @@ function placeNumber(number) {
     } else {
 
         /*
-         * Incorrect values remain editable.
+         * Incorrect number remains editable.
          */
         mistakes++;
 
@@ -1203,6 +1461,7 @@ function eraseSelected() {
 
 
     cell.value = 0;
+
     cell.candidates.clear();
 
 
@@ -1219,8 +1478,7 @@ function checkWin() {
     for (let i = 0; i < 81; i++) {
 
         if (
-            cells[i].value !==
-            solution[i]
+            cells[i].value !== solution[i]
         ) {
 
             return false;
@@ -1258,13 +1516,13 @@ function checkBoard() {
         if (cell.value === 0) {
 
             incomplete++;
+
             continue;
         }
 
 
         if (
-            cell.value !==
-            solution[i]
+            cell.value !== solution[i]
         ) {
 
             incorrect++;
@@ -1308,7 +1566,9 @@ function checkBoard() {
 function newGame() {
 
     gameFinished = false;
+
     selected = -1;
+
     mistakes = 0;
 
 
@@ -1342,7 +1602,7 @@ function newGame() {
 
 
 /* -----------------------------------------------------------
-   Mode
+   Mode switching
 ----------------------------------------------------------- */
 
 normalModeButton.addEventListener(
@@ -1351,13 +1611,18 @@ normalModeButton.addEventListener(
 
         mode = "number";
 
+
         normalModeButton.classList.add(
             "active"
         );
 
+
         candidateModeButton.classList.remove(
             "active"
         );
+
+
+        updateBoard();
     }
 );
 
@@ -1368,13 +1633,18 @@ candidateModeButton.addEventListener(
 
         mode = "candidate";
 
+
         candidateModeButton.classList.add(
             "active"
         );
 
+
         normalModeButton.classList.remove(
             "active"
         );
+
+
+        updateBoard();
     }
 );
 
@@ -1384,7 +1654,9 @@ candidateModeButton.addEventListener(
 ----------------------------------------------------------- */
 
 document
-    .querySelectorAll("[data-difficulty]")
+    .querySelectorAll(
+        "[data-difficulty]"
+    )
     .forEach(button => {
 
         button.addEventListener(
@@ -1428,6 +1700,7 @@ for (let n = 1; n <= 9; n++) {
 
 
     button.textContent = n;
+
 
     button.dataset.number = n;
 
@@ -1532,32 +1805,48 @@ document.addEventListener(
         switch (event.key) {
 
             case "ArrowUp":
-                row = Math.max(
-                    0,
-                    row - 1
-                );
+
+                row =
+                    Math.max(
+                        0,
+                        row - 1
+                    );
+
                 break;
+
 
             case "ArrowDown":
-                row = Math.min(
-                    8,
-                    row + 1
-                );
+
+                row =
+                    Math.min(
+                        8,
+                        row + 1
+                    );
+
                 break;
+
 
             case "ArrowLeft":
-                col = Math.max(
-                    0,
-                    col - 1
-                );
+
+                col =
+                    Math.max(
+                        0,
+                        col - 1
+                    );
+
                 break;
 
+
             case "ArrowRight":
-                col = Math.min(
-                    8,
-                    col + 1
-                );
+
+                col =
+                    Math.min(
+                        8,
+                        col + 1
+                    );
+
                 break;
+
 
             default:
                 return;
@@ -1575,7 +1864,7 @@ document.addEventListener(
 
 
 /* -----------------------------------------------------------
-   Start
+   Start game
 ----------------------------------------------------------- */
 
 newGame();
