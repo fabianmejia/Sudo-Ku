@@ -4,2612 +4,584 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sudoku</title>
-
 <style>
-* {
-    box-sizing: border-box;
+*{box-sizing:border-box}
+:root{
+ --bg:#111214;--panel:#191b1f;--panel2:#202328;
+ --cell:#181a1e;--cell-related:#292d33;--cell-selected:#3a3f47;--cell-match:#34302a;
+ --given:#d9dde4;--text:#e8eaed;--muted:#7f858f;
+ --accent:#d98b3a;--correct:#74c69d;--wrong:#e06c75;
+ --candidate:#34383f;--candidate-border:#5b616b;--unavailable:#282b30;--unavailable-text:#636872;
+ --border:#3b3f46;--major-border:#777d87;
 }
-
-:root {
-    --bg: #111214;
-    --panel: #191b1f;
-    --panel2: #202328;
-
-    --cell: #181a1e;
-    --cell-related: #292d33;
-    --cell-selected: #3a3f47;
-    --cell-match: #34302a;
-
-    --given: #d9dde4;
-    --text: #e8eaed;
-    --muted: #7f858f;
-
-    --accent: #d98b3a;
-    --correct: #74c69d;
-    --wrong: #e06c75;
-
-    --candidate: #34383f;
-    --candidate-border: #5b616b;
-
-    --unavailable: #282b30;
-    --unavailable-text: #636872;
-
-    --border: #3b3f46;
-    --major-border: #777d87;
-}
-
-body {
-    margin: 0;
-    min-height: 100vh;
-    background: var(--bg);
-    color: var(--text);
-
-    font-family:
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.game {
-    width: min(94vw, 560px);
-    padding: 18px 16px 28px;
-}
-
-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-h1 {
-    font-size: 26px;
-    margin: 0;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    flex: 1;
-}
-
-.top-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.difficulty {
-    display: flex;
-    gap: 4px;
-    background: var(--panel);
-    padding: 4px;
-    border-radius: 8px;
-}
-
-.difficulty button {
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-
-    padding: 6px 8px;
-    border-radius: 5px;
-
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.difficulty button.active {
-    background: var(--accent);
-    color: #111;
-}
-
-.new-game-top {
-    border: 1px solid var(--accent);
-    background: var(--accent);
-    color: #111;
-
-    border-radius: 7px;
-    padding: 8px 12px;
-
-    cursor: pointer;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.new-game-top:hover {
-    filter: brightness(1.08);
-}
-
-.info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    margin-bottom: 12px;
-
-    color: var(--muted);
-    font-size: 13px;
-}
-
-.mistakes {
-    color: var(--wrong);
-    opacity: 0;
-    transition: opacity .2s;
-}
-
-.mistakes.visible {
-    opacity: 1;
-}
-
-
-/* -----------------------------------------------------------
-   Board
------------------------------------------------------------ */
-
-.board {
-    width: min(92vw, 520px);
-    aspect-ratio: 1;
-    margin: auto;
-
-    display: grid;
-
-    grid-template-columns: repeat(9, 1fr);
-    grid-template-rows: repeat(9, 1fr);
-
-    background: var(--major-border);
-    border: 2px solid var(--major-border);
-
-    gap: 1px;
-}
-
-.cell {
-    position: relative;
-
-    min-width: 0;
-    min-height: 0;
-
-    background: var(--cell);
-
-    display: flex;
-    justify-content: center;
-    align-items: center;
-
-    cursor: pointer;
-    user-select: none;
-
-    transition:
-        background-color 0.08s ease,
-        box-shadow 0.08s ease;
-}
-
-
-/*
- * Selected cell's row and column.
- */
-.cell.line-related {
-    background: var(--cell-related);
-}
-
-
-/*
- * Selected cell.
- */
-.cell.selected {
-    background: var(--cell-selected);
-}
-
-
-/*
- * Other cells containing the same correct
- * number as the selected correct cell.
- */
-.cell.number-match {
-    background: var(--cell-match);
-}
-
-
-/*
- * Stronger selected-cell indication.
- */
-.cell.selected.number-match {
-    background: var(--cell-selected);
-
-    box-shadow:
-        inset 0 0 0 2px var(--accent);
-}
-
-
-/*
- * Only the boundaries between 3x3 boxes
- * get a thick line.
- */
-.cell.box-right {
-    border-right: 2px solid var(--major-border);
-}
-
-.cell.box-bottom {
-    border-bottom: 2px solid var(--major-border);
-}
-
-
-.cell.given {
-    color: var(--given);
-    font-weight: 600;
-}
-
-.cell.correct {
-    color: var(--correct);
-    font-weight: 600;
-    cursor: default;
-}
-
-.cell.wrong {
-    color: var(--wrong);
-    font-weight: 600;
-}
-
-
-/* -----------------------------------------------------------
-   Values and candidates
------------------------------------------------------------ */
-
-.value {
-    font-size: clamp(22px, 6vw, 34px);
-    line-height: 1;
-
-    position: relative;
-    z-index: 2;
-}
-
-
-/*
- * Candidate grid occupies the whole cell.
- */
-.candidates {
-    position: absolute;
-    inset: 0;
-
-    display: grid;
-
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-
-    pointer-events: none;
-}
-
-
-/*
- * Large candidates.
- */
-.candidate {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    color: #aeb4bd;
-
-    font-size: clamp(11px, 3vw, 17px);
-    line-height: 0.8;
-    font-weight: 500;
-
-    transform: scale(1.05);
-}
-
-
-/* -----------------------------------------------------------
-   Controls
------------------------------------------------------------ */
-
-.controls {
-    margin-top: 18px;
-}
-
-.mode {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-
-    margin-bottom: 12px;
-}
-
-.mode button,
-.action {
-    border: 1px solid var(--border);
-
-    background: var(--panel);
-    color: var(--text);
-
-    border-radius: 7px;
-    padding: 9px 14px;
-
-    cursor: pointer;
-}
-
-.mode button.active {
-    background: var(--accent);
-    color: #111;
-    border-color: var(--accent);
-}
-
-
-/* -----------------------------------------------------------
-   Number keypad
------------------------------------------------------------ */
-
-.number-pad {
-    display: grid;
-
-    grid-template-columns: repeat(9, 1fr);
-
-    gap: 6px;
-}
-
-.number-pad button {
-    height: 42px;
-
-    border: 1px solid var(--border);
-
-    background: var(--panel);
-    color: var(--text);
-
-    border-radius: 6px;
-
-    font-size: 17px;
-    cursor: pointer;
-
-    transition:
-        background-color 0.08s,
-        border-color 0.08s,
-        color 0.08s;
-}
-
-.number-pad button:hover:not(:disabled),
-.action:hover,
-.mode button:hover {
-    background: var(--panel2);
-}
-
-
-/*
- * Number or candidate already represented
- * in the selected cell.
- *
- * It becomes gray rather than orange.
- */
-.number-pad button.active-number,
-.number-pad button.candidate-number {
-    background: var(--candidate);
-    border-color: var(--candidate-border);
-    color: #fff;
-}
-
-
-/*
- * A completed number can no longer be entered
- * as either a normal value or a candidate.
- */
-.number-pad button.unavailable {
-    background: var(--unavailable);
-    border-color: #30343a;
-    color: var(--unavailable-text);
-
-    cursor: not-allowed;
-    opacity: 0.7;
-}
-
-.number-pad button.unavailable:hover {
-    background: var(--unavailable);
-}
-
-
-/* -----------------------------------------------------------
-   Bottom buttons
------------------------------------------------------------ */
-
-.bottom-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-
-    margin-top: 12px;
-}
-
-.action {
-    min-width: 94px;
-}
-
-.action:disabled {
-    background: var(--unavailable);
-    border-color: #30343a;
-    color: var(--unavailable-text);
-
-    cursor: not-allowed;
-}
-
-
-/* -----------------------------------------------------------
-   Message
------------------------------------------------------------ */
-
-.message {
-    text-align: center;
-
-    min-height: 22px;
-    margin-top: 12px;
-
-    font-size: 14px;
-    color: var(--muted);
-}
-
-.message.success {
-    color: var(--correct);
-}
-
-.message.error {
-    color: var(--wrong);
-}
-
-
-/* -----------------------------------------------------------
-   Solved popup
------------------------------------------------------------ */
-
-.modal-backdrop {
-    position: fixed;
-    inset: 0;
-
-    background: rgba(0, 0, 0, 0.68);
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    padding: 20px;
-
-    z-index: 100;
-
-    opacity: 1;
-
-    transition: opacity 0.15s ease;
-}
-
-.modal-backdrop.hidden {
-    display: none;
-}
-
-.modal {
-    width: min(86vw, 320px);
-
-    background: var(--panel);
-
-    border: 1px solid var(--border);
-    border-radius: 12px;
-
-    padding: 28px 24px 22px;
-
-    text-align: center;
-
-    box-shadow:
-        0 18px 60px rgba(0, 0, 0, 0.45);
-}
-
-.modal h2 {
-    margin: 0 0 18px;
-
-    font-size: 28px;
-    font-weight: 600;
-
-    text-transform: lowercase;
-}
-
-.modal button {
-    min-width: 100px;
-
-    border: 1px solid var(--accent);
-
-    background: var(--accent);
-    color: #111;
-
-    border-radius: 7px;
-    padding: 9px 16px;
-
-    cursor: pointer;
-    font-weight: 600;
-}
-
-
-/* -----------------------------------------------------------
-   Mobile
------------------------------------------------------------ */
-
-@media (max-width: 700px) {
-
-    header {
-        align-items: flex-start;
-    }
-
-    .top-controls {
-        flex-wrap: wrap;
-        justify-content: flex-end;
-    }
-
-    .difficulty {
-        order: 2;
-    }
-
-    .new-game-top {
-        order: 1;
-    }
-}
-
-@media (max-width: 420px) {
-
-    .game {
-        padding: 12px 8px 20px;
-    }
-
-    header {
-        gap: 8px;
-    }
-
-    .top-controls {
-        width: 100%;
-        justify-content: space-between;
-    }
-
-    .difficulty {
-        flex: 1;
-    }
-
-    .difficulty button {
-        flex: 1;
-        padding: 6px 5px;
-    }
-
-    .new-game-top {
-        padding: 8px 10px;
-    }
-
-    .number-pad {
-        gap: 4px;
-    }
-
-    .number-pad button {
-        height: 38px;
-    }
-}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;justify-content:center;align-items:center}
+.game{width:min(94vw,560px);padding:18px 16px 28px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+h1{font-size:26px;margin:0;font-weight:600;letter-spacing:.5px;flex:1}
+.top-controls{display:flex;align-items:center;gap:8px}
+.difficulty{display:flex;gap:4px;background:var(--panel);padding:4px;border-radius:8px}
+.difficulty button{border:0;background:transparent;color:var(--muted);padding:6px 8px;border-radius:5px;cursor:pointer;font-size:12px}
+.difficulty button.active{background:var(--accent);color:#111}
+.new-game-top{border:1px solid var(--accent);background:var(--accent);color:#111;border-radius:7px;padding:8px 12px;cursor:pointer;font-weight:600;white-space:nowrap}
+.new-game-top:hover{filter:brightness(1.08)}
+.info{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;color:var(--muted);font-size:13px}
+.mistakes{color:var(--wrong);opacity:0;transition:opacity .2s}.mistakes.visible{opacity:1}
+.board{width:min(92vw,520px);aspect-ratio:1;margin:auto;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);background:var(--major-border);border:2px solid var(--major-border);gap:1px}
+.cell{position:relative;min-width:0;min-height:0;background:var(--cell);display:flex;justify-content:center;align-items:center;cursor:pointer;user-select:none;transition:background-color .08s ease,box-shadow .08s ease}
+.cell.line-related{background:var(--cell-related)}
+.cell.selected{background:var(--cell-selected)}
+.cell.number-match{background:var(--cell-match)}
+.cell.selected.number-match{background:var(--cell-selected);box-shadow:inset 0 0 0 2px var(--accent)}
+.cell.box-right{border-right:2px solid var(--major-border)}
+.cell.box-bottom{border-bottom:2px solid var(--major-border)}
+.cell.given{color:var(--given);font-weight:600}
+.cell.correct{color:var(--correct);font-weight:600;cursor:default}
+.cell.wrong{color:var(--wrong);font-weight:600}
+.value{font-size:clamp(22px,6vw,34px);line-height:1;position:relative;z-index:2}
+.candidates{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);pointer-events:none}
+.candidate{display:flex;align-items:center;justify-content:center;color:#aeb4bd;font-size:clamp(11px,3vw,17px);line-height:.8;font-weight:500;transform:scale(1.05)}
+.controls{margin-top:18px}
+.mode{display:flex;justify-content:center;gap:8px;margin-bottom:12px}
+.mode button,.action{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:7px;padding:9px 14px;cursor:pointer}
+.mode button.active{background:var(--accent);color:#111;border-color:var(--accent)}
+.number-pad{display:grid;grid-template-columns:repeat(9,1fr);gap:6px}
+.number-pad button{height:42px;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:6px;font-size:17px;cursor:pointer;transition:background-color .08s,border-color .08s,color .08s}
+.number-pad button:hover:not(:disabled),.action:hover,.mode button:hover{background:var(--panel2)}
+/* A number/candidate already present in the selected cell becomes grey when active. */
+.number-pad button.active-number,.number-pad button.candidate-number{background:var(--candidate);border-color:var(--candidate-border);color:#fff}
+/* Completed numbers are unavailable in both modes. */
+.number-pad button.unavailable{background:var(--unavailable);border-color:#30343a;color:var(--unavailable-text);cursor:not-allowed;opacity:.7}
+.number-pad button.unavailable:hover{background:var(--unavailable)}
+.bottom-actions{display:flex;gap:8px;justify-content:center;margin-top:12px}
+.action{min-width:94px}
+.action:disabled{background:var(--unavailable);border-color:#30343a;color:var(--unavailable-text);cursor:not-allowed}
+.message{text-align:center;min-height:22px;margin-top:12px;font-size:14px;color:var(--muted)}
+.message.success{color:var(--correct)}.message.error{color:var(--wrong)}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.68);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100;opacity:1;transition:opacity .15s ease}
+.modal-backdrop.hidden{display:none}
+.modal{width:min(86vw,320px);background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:28px 24px 22px;text-align:center;box-shadow:0 18px 60px rgba(0,0,0,.45)}
+.modal h2{margin:0 0 18px;font-size:28px;font-weight:600;text-transform:lowercase}
+.modal button{min-width:100px;border:1px solid var(--accent);background:var(--accent);color:#111;border-radius:7px;padding:9px 16px;cursor:pointer;font-weight:600}
+@media(max-width:700px){header{align-items:flex-start}.top-controls{flex-wrap:wrap;justify-content:flex-end}.difficulty{order:2}.new-game-top{order:1}}
+@media(max-width:420px){.game{padding:12px 8px 20px}header{gap:8px}.top-controls{width:100%;justify-content:space-between}.difficulty{flex:1}.difficulty button{flex:1;padding:6px 5px}.new-game-top{padding:8px 10px}.number-pad{gap:4px}.number-pad button{height:38px}}
 </style>
 </head>
-
 <body>
-
 <div class="game">
+<header>
+<h1>Sudoku</h1>
+<div class="top-controls">
+<div class="difficulty">
+<button data-difficulty="easy">Easy</button>
+<button data-difficulty="medium" class="active">Medium</button>
+<button data-difficulty="hard">Hard</button>
+<button data-difficulty="expert">Expert</button>
+</div>
+<button class="new-game-top" id="newGame">New Game</button>
+</div>
+</header>
 
-    <header>
-
-        <h1>Sudoku</h1>
-
-        <div class="top-controls">
-
-            <div class="difficulty">
-
-                <button data-difficulty="easy">
-                    Easy
-                </button>
-
-                <button
-                    data-difficulty="medium"
-                    class="active"
-                >
-                    Medium
-                </button>
-
-                <button data-difficulty="hard">
-                    Hard
-                </button>
-
-                <button data-difficulty="expert">
-                    Expert
-                </button>
-
-            </div>
-
-            <button
-                class="new-game-top"
-                id="newGame"
-            >
-                New Game
-            </button>
-
-        </div>
-
-    </header>
-
-
-    <div class="info">
-
-        <span id="status">
-            Medium
-        </span>
-
-        <span
-            id="mistakes"
-            class="mistakes"
-        >
-            Mistakes: 0
-        </span>
-
-    </div>
-
-
-    <div
-        id="board"
-        class="board"
-    ></div>
-
-
-    <div class="controls">
-
-        <div class="mode">
-
-            <button
-                id="normalMode"
-                class="active"
-            >
-                Number
-            </button>
-
-            <button id="candidateMode">
-                Candidates
-            </button>
-
-        </div>
-
-
-        <div
-            id="numberPad"
-            class="number-pad"
-        ></div>
-
-
-        <div class="bottom-actions">
-
-            <button
-                class="action"
-                id="undo"
-            >
-                Undo
-            </button>
-
-            <button
-                class="action"
-                id="erase"
-            >
-                Erase
-            </button>
-
-            <button
-                class="action"
-                id="check"
-            >
-                Check
-            </button>
-
-        </div>
-
-
-        <div
-            id="message"
-            class="message"
-        ></div>
-
-    </div>
-
+<div class="info">
+<span id="status">Medium</span>
+<span id="mistakes" class="mistakes">Mistakes: 0</span>
 </div>
 
+<div id="board" class="board"></div>
 
-<div
-    id="solvedModal"
-    class="modal-backdrop hidden"
-    aria-hidden="true"
->
-
-    <div
-        class="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="solvedTitle"
-    >
-
-        <h2 id="solvedTitle">
-            Solved
-        </h2>
-
-        <button id="closeSolved">
-            Close
-        </button>
-
-    </div>
-
+<div class="controls">
+<div class="mode">
+<button id="normalMode" class="active">Number</button>
+<button id="candidateMode">Candidates</button>
+</div>
+<div id="numberPad" class="number-pad"></div>
+<div class="bottom-actions">
+<button class="action" id="undo">Undo</button>
+<button class="action" id="erase">Erase</button>
+<button class="action" id="check">Check</button>
+</div>
+<div id="message" class="message"></div>
+</div>
 </div>
 
+<div id="solvedModal" class="modal-backdrop hidden" aria-hidden="true">
+<div class="modal" role="dialog" aria-modal="true" aria-labelledby="solvedTitle">
+<h2 id="solvedTitle">Solved</h2>
+<button id="closeSolved">Close</button>
+</div>
+</div>
 
 <script>
 "use strict";
 
+const boardElement=document.getElementById("board");
+const numberPad=document.getElementById("numberPad");
+const messageElement=document.getElementById("message");
+const mistakesElement=document.getElementById("mistakes");
+const statusElement=document.getElementById("status");
+const normalModeButton=document.getElementById("normalMode");
+const candidateModeButton=document.getElementById("candidateMode");
+const undoButton=document.getElementById("undo");
+const newGameButton=document.getElementById("newGame");
+const solvedModal=document.getElementById("solvedModal");
+const closeSolvedButton=document.getElementById("closeSolved");
 
-/* -----------------------------------------------------------
-   DOM
------------------------------------------------------------ */
+const SESSION_KEY="sudoku-session-v1";
 
-const boardElement =
-    document.getElementById("board");
+let solution=[];
+let puzzle=[];
+let cells=[];
+let selected=-1;
+let mode="number";
+let difficulty="medium";
+let currentDifficulty="medium";
+let mistakes=0;
+let gameFinished=false;
+let history=[];
 
-const numberPad =
-    document.getElementById("numberPad");
+function shuffle(array){const a=[...array];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function index(row,col){return row*9+col}
+function rowOf(i){return Math.floor(i/9)}
+function colOf(i){return i%9}
+function boxOf(i){return Math.floor(rowOf(i)/3)*3+Math.floor(colOf(i)/3)}
+function difficultyName(d){return d.charAt(0).toUpperCase()+d.slice(1)}
 
-const messageElement =
-    document.getElementById("message");
-
-const mistakesElement =
-    document.getElementById("mistakes");
-
-const statusElement =
-    document.getElementById("status");
-
-const normalModeButton =
-    document.getElementById("normalMode");
-
-const candidateModeButton =
-    document.getElementById("candidateMode");
-
-const undoButton =
-    document.getElementById("undo");
-
-const newGameButton =
-    document.getElementById("newGame");
-
-const solvedModal =
-    document.getElementById("solvedModal");
-
-const closeSolvedButton =
-    document.getElementById("closeSolved");
-
-
-/* -----------------------------------------------------------
-   Game state
------------------------------------------------------------ */
-
-let solution = [];
-let puzzle = [];
-let cells = [];
-
-let selected = -1;
-
-let mode = "number";
-
-let difficulty = "medium";
-let currentDifficulty = "medium";
-
-let mistakes = 0;
-
-let gameFinished = false;
-
-let history = [];
-
-
-/* -----------------------------------------------------------
-   Utility
------------------------------------------------------------ */
-
-function shuffle(array) {
-
-    const a = [...array];
-
-    for (
-        let i = a.length - 1;
-        i > 0;
-        i--
-    ) {
-
-        const j =
-            Math.floor(
-                Math.random() * (i + 1)
-            );
-
-        [a[i], a[j]] =
-            [a[j], a[i]];
-    }
-
-    return a;
+function isValid(board,pos,num){
+ const row=rowOf(pos),col=colOf(pos),boxRow=Math.floor(row/3)*3,boxCol=Math.floor(col/3)*3;
+ for(let c=0;c<9;c++)if(board[index(row,c)]===num)return false;
+ for(let r=0;r<9;r++)if(board[index(r,col)]===num)return false;
+ for(let r=boxRow;r<boxRow+3;r++)for(let c=boxCol;c<boxCol+3;c++)if(board[index(r,c)]===num)return false;
+ return true;
 }
 
-
-function index(row, col) {
-    return row * 9 + col;
+function solve(board){
+ let bestPos=-1,bestCandidates=null;
+ for(let i=0;i<81;i++){
+  if(board[i]!==0)continue;
+  const candidates=[];
+  for(let n=1;n<=9;n++)if(isValid(board,i,n))candidates.push(n);
+  if(candidates.length===0)return false;
+  if(bestCandidates===null||candidates.length<bestCandidates.length){bestCandidates=candidates;bestPos=i;if(candidates.length===1)break}
+ }
+ if(bestPos===-1)return true;
+ for(const n of shuffle(bestCandidates)){board[bestPos]=n;if(solve(board))return true;board[bestPos]=0}
+ return false;
 }
 
+function generateSolution(){const board=Array(81).fill(0);solve(board);return board}
 
-function rowOf(i) {
-    return Math.floor(i / 9);
+function countSolutions(board,limit=2){
+ let count=0;
+ function search(){
+  if(count>=limit)return;
+  let bestPos=-1,bestCandidates=null;
+  for(let i=0;i<81;i++){
+   if(board[i]!==0)continue;
+   const candidates=[];
+   for(let n=1;n<=9;n++)if(isValid(board,i,n))candidates.push(n);
+   if(candidates.length===0)return;
+   if(bestCandidates===null||candidates.length<bestCandidates.length){bestCandidates=candidates;bestPos=i}
+  }
+  if(bestPos===-1){count++;return}
+  for(const n of bestCandidates){board[bestPos]=n;search();if(count>=limit){board[bestPos]=0;return}}
+  board[bestPos]=0;
+ }
+ search();return count;
 }
 
-
-function colOf(i) {
-    return i % 9;
+function generatePuzzle(){
+ solution=generateSolution();
+ puzzle=[...solution];
+ const targets={easy:40,medium:48,hard:54,expert:59};
+ const targetRemoved=targets[difficulty];
+ const positions=shuffle([...Array(81).keys()]);
+ let removed=0;
+ for(const pos of positions){
+  if(removed>=targetRemoved)break;
+  const old=puzzle[pos];
+  puzzle[pos]=0;
+  const test=[...puzzle];
+  if(countSolutions(test,2)!==1)puzzle[pos]=old;else removed++;
+ }
 }
 
-
-function boxOf(i) {
-
-    return (
-        Math.floor(rowOf(i) / 3) * 3 +
-        Math.floor(colOf(i) / 3)
-    );
+function createCells(){
+ cells=[];
+ for(let i=0;i<81;i++)cells.push({value:puzzle[i],given:puzzle[i]!==0,locked:puzzle[i]!==0,candidates:new Set(),element:null});
 }
 
+function sameRow(a,b){return rowOf(a)===rowOf(b)}
+function sameColumn(a,b){return colOf(a)===colOf(b)}
+function sameBox(a,b){return boxOf(a)===boxOf(b)}
+function relatedCells(a,b){return sameRow(a,b)||sameColumn(a,b)||sameBox(a,b)}
 
-function difficultyName(d) {
+function renderBoard(){
+ boardElement.innerHTML="";
+ for(let i=0;i<81;i++){
+  const cell=document.createElement("div");
+  cell.className="cell";
+  if(colOf(i)===2||colOf(i)===5)cell.classList.add("box-right");
+  if(rowOf(i)===2||rowOf(i)===5)cell.classList.add("box-bottom");
 
-    return (
-        d.charAt(0).toUpperCase() +
-        d.slice(1)
-    );
+  const value=document.createElement("div");
+  value.className="value";
+
+  const candidates=document.createElement("div");
+  candidates.className="candidates";
+  for(let n=1;n<=9;n++){
+   const candidate=document.createElement("div");
+   candidate.className="candidate";
+   candidate.dataset.number=n;
+   candidates.appendChild(candidate);
+  }
+  cell.append(value,candidates);
+  cell.addEventListener("click",()=>selectCell(i));
+  cells[i].element=cell;
+  boardElement.appendChild(cell);
+ }
+ updateBoard();
 }
 
-
-/* -----------------------------------------------------------
-   Sudoku validation
------------------------------------------------------------ */
-
-function isValid(board, pos, num) {
-
-    const row = rowOf(pos);
-    const col = colOf(pos);
-
-    const boxRow =
-        Math.floor(row / 3) * 3;
-
-    const boxCol =
-        Math.floor(col / 3) * 3;
-
-
-    /* Row */
-
-    for (let c = 0; c < 9; c++) {
-
-        if (
-            board[index(row, c)] === num
-        ) {
-
-            return false;
-        }
-    }
-
-
-    /* Column */
-
-    for (let r = 0; r < 9; r++) {
-
-        if (
-            board[index(r, col)] === num
-        ) {
-
-            return false;
-        }
-    }
-
-
-    /* Box */
-
-    for (
-        let r = boxRow;
-        r < boxRow + 3;
-        r++
-    ) {
-
-        for (
-            let c = boxCol;
-            c < boxCol + 3;
-            c++
-        ) {
-
-            if (
-                board[index(r, c)] === num
-            ) {
-
-                return false;
-            }
-        }
-    }
-
-    return true;
+function saveSession(){
+ try{
+  if(!puzzle.length)return;
+  const state={
+   version:1,
+   solution,
+   puzzle,
+   cells:cells.map(cell=>({value:cell.value,locked:cell.locked,candidates:[...cell.candidates]})),
+   selected,
+   mode,
+   difficulty,
+   currentDifficulty,
+   mistakes,
+   gameFinished,
+   history,
+   solvedPopupOpen:!solvedModal.classList.contains("hidden")
+  };
+  localStorage.setItem(SESSION_KEY,JSON.stringify(state));
+ }catch(error){
+  console.warn("Unable to save Sudoku session:",error);
+ }
 }
 
+function loadSession(){
+ try{
+  const raw=localStorage.getItem(SESSION_KEY);
+  if(!raw)return false;
+  const state=JSON.parse(raw);
 
-/* -----------------------------------------------------------
-   Solver
------------------------------------------------------------ */
+  if(
+   state.version!==1 ||
+   !Array.isArray(state.solution) || state.solution.length!==81 ||
+   !Array.isArray(state.puzzle) || state.puzzle.length!==81 ||
+   !Array.isArray(state.cells) || state.cells.length!==81
+  )return false;
 
-function solve(board) {
+  solution=state.solution;
+  puzzle=state.puzzle;
+  selected=Number.isInteger(state.selected)?state.selected:-1;
+  mode=state.mode==="candidate"?"candidate":"number";
+  difficulty=["easy","medium","hard","expert"].includes(state.difficulty)?state.difficulty:"medium";
+  currentDifficulty=["easy","medium","hard","expert"].includes(state.currentDifficulty)?state.currentDifficulty:difficulty;
+  mistakes=Number.isInteger(state.mistakes)?state.mistakes:0;
+  gameFinished=Boolean(state.gameFinished);
 
-    let bestPos = -1;
-    let bestCandidates = null;
+  createCells();
 
+  state.cells.forEach((saved,i)=>{
+   if(!saved || !Array.isArray(saved.candidates))return;
+   cells[i].value=Number.isInteger(saved.value)?saved.value:0;
+   cells[i].locked=Boolean(saved.locked);
+   cells[i].candidates=new Set(
+    saved.candidates.filter(n=>Number.isInteger(n)&&n>=1&&n<=9)
+   );
+  });
 
-    for (let i = 0; i < 81; i++) {
+  history=Array.isArray(state.history)?state.history:[];
+  if(history.length>200)history=history.slice(-200);
 
-        if (board[i] !== 0) {
-            continue;
-        }
+  statusElement.textContent=difficultyName(currentDifficulty);
+  mistakesElement.textContent="Mistakes: "+mistakes;
+  mistakesElement.classList.toggle("visible",mistakes>0);
 
+  normalModeButton.classList.toggle("active",mode==="number");
+  candidateModeButton.classList.toggle("active",mode==="candidate");
 
-        const candidates = [];
+  document.querySelectorAll("[data-difficulty]").forEach(button=>{
+   button.classList.toggle("active",button.dataset.difficulty===difficulty);
+  });
 
+  renderBoard();
 
-        for (let n = 1; n <= 9; n++) {
+  if(gameFinished && state.solvedPopupOpen){
+   showSolvedModal(false);
+  }else{
+   hideSolvedModal(false);
+  }
 
-            if (
-                isValid(board, i, n)
-            ) {
-
-                candidates.push(n);
-            }
-        }
-
-
-        if (candidates.length === 0) {
-            return false;
-        }
-
-
-        if (
-            bestCandidates === null ||
-            candidates.length <
-            bestCandidates.length
-        ) {
-
-            bestCandidates = candidates;
-            bestPos = i;
-
-
-            if (
-                candidates.length === 1
-            ) {
-
-                break;
-            }
-        }
-    }
-
-
-    if (bestPos === -1) {
-        return true;
-    }
-
-
-    for (
-        const n of shuffle(bestCandidates)
-    ) {
-
-        board[bestPos] = n;
-
-
-        if (solve(board)) {
-            return true;
-        }
-
-
-        board[bestPos] = 0;
-    }
-
-
-    return false;
+  updateBoard();
+  return true;
+ }catch(error){
+  console.warn("Unable to restore Sudoku session:",error);
+  localStorage.removeItem(SESSION_KEY);
+  return false;
+ }
 }
 
-
-function generateSolution() {
-
-    const board =
-        Array(81).fill(0);
-
-    solve(board);
-
-    return board;
+function snapshot(){
+ return {
+  cells:cells.map(cell=>({value:cell.value,locked:cell.locked,candidates:[...cell.candidates]})),
+  mistakes,
+  gameFinished
+ };
 }
 
-
-/* -----------------------------------------------------------
-   Solution counter
------------------------------------------------------------ */
-
-function countSolutions(
-    board,
-    limit = 2
-) {
-
-    let count = 0;
-
-
-    function search() {
-
-        if (count >= limit) {
-            return;
-        }
-
-
-        let bestPos = -1;
-        let bestCandidates = null;
-
-
-        for (let i = 0; i < 81; i++) {
-
-            if (board[i] !== 0) {
-                continue;
-            }
-
-
-            const candidates = [];
-
-
-            for (let n = 1; n <= 9; n++) {
-
-                if (
-                    isValid(board, i, n)
-                ) {
-
-                    candidates.push(n);
-                }
-            }
-
-
-            if (candidates.length === 0) {
-                return;
-            }
-
-
-            if (
-                bestCandidates === null ||
-                candidates.length <
-                bestCandidates.length
-            ) {
-
-                bestCandidates = candidates;
-                bestPos = i;
-            }
-        }
-
-
-        if (bestPos === -1) {
-
-            count++;
-            return;
-        }
-
-
-        for (
-            const n of bestCandidates
-        ) {
-
-            board[bestPos] = n;
-
-            search();
-
-
-            if (count >= limit) {
-
-                board[bestPos] = 0;
-
-                return;
-            }
-        }
-
-
-        board[bestPos] = 0;
-    }
-
-
-    search();
-
-    return count;
+function pushHistory(){
+ history.push(snapshot());
+ if(history.length>200)history.shift();
+ updateUndoButton();
 }
 
-
-/* -----------------------------------------------------------
-   Puzzle generation
------------------------------------------------------------ */
-
-function generatePuzzle() {
-
-    solution =
-        generateSolution();
-
-    puzzle =
-        [...solution];
-
-
-    const targets = {
-        easy: 40,
-        medium: 48,
-        hard: 54,
-        expert: 59
-    };
-
-
-    const targetRemoved =
-        targets[difficulty];
-
-
-    const positions =
-        shuffle(
-            [...Array(81).keys()]
-        );
-
-
-    let removed = 0;
-
-
-    for (
-        const pos of positions
-    ) {
-
-        if (
-            removed >= targetRemoved
-        ) {
-
-            break;
-        }
-
-
-        const old =
-            puzzle[pos];
-
-
-        puzzle[pos] = 0;
-
-
-        const test =
-            [...puzzle];
-
-
-        if (
-            countSolutions(test, 2) !== 1
-        ) {
-
-            puzzle[pos] = old;
-
-        } else {
-
-            removed++;
-        }
-    }
+function restoreSnapshot(state){
+ state.cells.forEach((saved,i)=>{
+  cells[i].value=saved.value;
+  cells[i].locked=saved.locked;
+  cells[i].candidates=new Set(saved.candidates);
+ });
+ mistakes=state.mistakes;
+ gameFinished=state.gameFinished;
+ hideSolvedModal();
+ messageElement.textContent="";
+ messageElement.className="message";
+ updateBoard();
+ updateUndoButton();
 }
 
-
-/* -----------------------------------------------------------
-   Cells
------------------------------------------------------------ */
-
-function createCells() {
-
-    cells = [];
-
-
-    for (let i = 0; i < 81; i++) {
-
-        cells.push({
-
-            value: puzzle[i],
-
-            given:
-                puzzle[i] !== 0,
-
-            locked:
-                puzzle[i] !== 0,
-
-            candidates:
-                new Set(),
-
-            element:
-                null
-        });
-    }
+function undo(){
+ if(history.length===0)return;
+ restoreSnapshot(history.pop());
+ saveSession();
 }
 
+function updateUndoButton(){undoButton.disabled=history.length===0}
 
-/* -----------------------------------------------------------
-   Relationships
------------------------------------------------------------ */
-
-function sameRow(a, b) {
-    return rowOf(a) === rowOf(b);
+function selectCell(i){
+ if(gameFinished)return;
+ selected=i;
+ updateBoard();
+ saveSession();
 }
 
-
-function sameColumn(a, b) {
-    return colOf(a) === colOf(b);
+function isNumberComplete(number){
+ let count=0;
+ for(let i=0;i<81;i++){
+  if(solution[i]===number){
+   if(cells[i].value===number&&(cells[i].given||cells[i].locked))count++;
+  }
+ }
+ return count===9;
 }
 
-
-function sameBox(a, b) {
-    return boxOf(a) === boxOf(b);
+function getCompletedNumbers(){
+ const completed=new Set();
+ for(let n=1;n<=9;n++)if(isNumberComplete(n))completed.add(n);
+ return completed;
 }
 
-
-function relatedCells(a, b) {
-
-    return (
-        sameRow(a, b) ||
-        sameColumn(a, b) ||
-        sameBox(a, b)
-    );
+function removeCandidateFromPeers(pos,number){
+ const row=rowOf(pos),col=colOf(pos),box=boxOf(pos);
+ for(let i=0;i<81;i++)if(i!==pos&&(rowOf(i)===row||colOf(i)===col||boxOf(i)===box))cells[i].candidates.delete(number);
 }
 
-
-/* -----------------------------------------------------------
-   Board rendering
------------------------------------------------------------ */
-
-function renderBoard() {
-
-    boardElement.innerHTML = "";
-
-
-    for (let i = 0; i < 81; i++) {
-
-        const cell =
-            document.createElement("div");
-
-        cell.className = "cell";
-
-
-        /*
-         * Thick vertical boundaries only at
-         * the boundaries of 3x3 boxes.
-         */
-        if (
-            colOf(i) === 2 ||
-            colOf(i) === 5
-        ) {
-
-            cell.classList.add(
-                "box-right"
-            );
-        }
-
-
-        /*
-         * Thick horizontal boundaries only at
-         * the boundaries of 3x3 boxes.
-         */
-        if (
-            rowOf(i) === 2 ||
-            rowOf(i) === 5
-        ) {
-
-            cell.classList.add(
-                "box-bottom"
-            );
-        }
-
-
-        const value =
-            document.createElement("div");
-
-        value.className = "value";
-
-
-        const candidates =
-            document.createElement("div");
-
-        candidates.className =
-            "candidates";
-
-
-        for (let n = 1; n <= 9; n++) {
-
-            const candidate =
-                document.createElement("div");
-
-            candidate.className =
-                "candidate";
-
-            candidate.dataset.number =
-                n;
-
-            /*
-             * Candidate starts empty.
-             */
-            candidate.textContent = "";
-
-            candidates.appendChild(
-                candidate
-            );
-        }
-
-
-        cell.append(
-            value,
-            candidates
-        );
-
-
-        cell.addEventListener(
-            "click",
-            () => selectCell(i)
-        );
-
-
-        cells[i].element =
-            cell;
-
-        boardElement.appendChild(
-            cell
-        );
-    }
-
-
-    updateBoard();
+function removeCompletedNumberCandidates(number){
+ for(let i=0;i<81;i++)cells[i].candidates.delete(number);
 }
 
-
-/* -----------------------------------------------------------
-   Undo snapshots
------------------------------------------------------------ */
-
-function snapshot() {
-
-    return {
-
-        cells:
-            cells.map(cell => ({
-
-                value:
-                    cell.value,
-
-                locked:
-                    cell.locked,
-
-                candidates:
-                    [...cell.candidates]
-
-            })),
-
-        mistakes,
-        gameFinished
-    };
+function refreshCompletedNumbers(){
+ for(let n=1;n<=9;n++)if(isNumberComplete(n))removeCompletedNumberCandidates(n);
 }
 
-
-function pushHistory() {
-
-    history.push(
-        snapshot()
-    );
-
-
-    if (history.length > 200) {
-
-        history.shift();
-    }
-
-
-    updateUndoButton();
+function updateBoard(){
+ let selectedIsCorrect=false,selectedValue=0;
+ if(selected!==-1){const selectedCell=cells[selected];selectedValue=selectedCell.value;selectedIsCorrect=selectedValue!==0&&selectedValue===solution[selected]}
+ for(let i=0;i<81;i++){
+  const state=cells[i],element=state.element;
+  element.classList.toggle("selected",i===selected);
+  element.classList.toggle("line-related",selected!==-1&&i!==selected&&(sameRow(i,selected)||sameColumn(i,selected)));
+  element.classList.toggle("number-match",selectedIsCorrect&&i!==selected&&state.value===selectedValue&&state.value===solution[i]);
+  element.classList.toggle("given",state.given);
+  element.classList.toggle("correct",state.locked&&!state.given);
+  element.classList.toggle("wrong",!state.locked&&!state.given&&state.value!==0&&state.value!==solution[i]);
+  element.querySelector(".value").textContent=state.value===0?"":state.value;
+  element.querySelectorAll(".candidate").forEach(candidate=>{
+   const n=Number(candidate.dataset.number),active=state.candidates.has(n);
+   candidate.textContent=active?n:"";
+   candidate.classList.toggle("active",active);
+  });
+ }
+ updateNumberPad();
+ updateUndoButton();
 }
 
-
-function restoreSnapshot(state) {
-
-    state.cells.forEach(
-        (saved, i) => {
-
-            cells[i].value =
-                saved.value;
-
-            cells[i].locked =
-                saved.locked;
-
-            cells[i].candidates =
-                new Set(saved.candidates);
-        }
-    );
-
-
-    mistakes =
-        state.mistakes;
-
-    gameFinished =
-        state.gameFinished;
-
-
-    hideSolvedModal();
-
-
-    messageElement.textContent = "";
-
-    messageElement.className =
-        "message";
-
-
-    updateBoard();
-
-    updateUndoButton();
+function updateNumberPad(){
+ const selectedValue=selected>=0?cells[selected].value:0;
+ const selectedCandidates=selected>=0?cells[selected].candidates:new Set();
+ const completed=getCompletedNumbers();
+ document.querySelectorAll(".number-pad button").forEach(button=>{
+  const n=Number(button.dataset.number);
+  const represented=n===selectedValue||selectedCandidates.has(n);
+  const active=n===selectedValue;
+  const candidate=selectedCandidates.has(n);
+  button.classList.toggle("active-number",active);
+  button.classList.toggle("candidate-number",candidate);
+  button.classList.toggle("unavailable",completed.has(n));
+  button.disabled=completed.has(n);
+  button.setAttribute("aria-disabled",completed.has(n)?"true":"false");
+ });
 }
 
-
-function undo() {
-
-    if (history.length === 0) {
-        return;
-    }
-
-
-    const state =
-        history.pop();
-
-
-    restoreSnapshot(state);
+function toggleCandidate(number){
+ if(selected===-1)return;
+ const cell=cells[selected];
+ if(cell.locked||cell.given||cell.value!==0)return;
+ if(isNumberComplete(number))return;
+ pushHistory();
+ if(cell.candidates.has(number))cell.candidates.delete(number);else cell.candidates.add(number);
+ updateBoard();
+ saveSession();
 }
 
-
-function updateUndoButton() {
-
-    undoButton.disabled =
-        history.length === 0;
+function placeNumber(number){
+ if(selected===-1||gameFinished)return;
+ if(isNumberComplete(number))return;
+ const cell=cells[selected];
+ if(cell.locked||cell.given)return;
+ if(mode==="candidate"){toggleCandidate(number);return}
+ pushHistory();
+ if(cell.value===number){cell.value=0;updateBoard();return}
+ cell.candidates.clear();
+ cell.value=number;
+ if(number===solution[selected]){
+  cell.locked=true;
+  removeCandidateFromPeers(selected,number);
+  refreshCompletedNumbers();
+  checkWin();
+ }else{
+  mistakes++;
+  mistakesElement.textContent="Mistakes: "+mistakes;
+  mistakesElement.classList.add("visible");
+ }
+ updateBoard();
+ saveSession();
 }
 
-
-/* -----------------------------------------------------------
-   Cell selection
------------------------------------------------------------ */
-
-function selectCell(i) {
-
-    if (gameFinished) {
-        return;
-    }
-
-
-    selected = i;
-
-    updateBoard();
+function eraseSelected(){
+ if(selected===-1||gameFinished)return;
+ const cell=cells[selected];
+ if(cell.locked||cell.given)return;
+ if(cell.value===0&&cell.candidates.size===0)return;
+ pushHistory();
+ cell.value=0;
+ cell.candidates.clear();
+ updateBoard();
+ saveSession();
 }
 
-
-/* -----------------------------------------------------------
-   Completed numbers
------------------------------------------------------------ */
-
-function isNumberComplete(number) {
-
-    let count = 0;
-
-
-    for (let i = 0; i < 81; i++) {
-
-        if (
-            solution[i] === number
-        ) {
-
-            if (
-                cells[i].value === number &&
-                (
-                    cells[i].given ||
-                    cells[i].locked
-                )
-            ) {
-
-                count++;
-            }
-        }
-    }
-
-
-    return count === 9;
+function checkWin(){
+ for(let i=0;i<81;i++)if(cells[i].value!==solution[i])return false;
+ gameFinished=true;
+ messageElement.textContent="Puzzle solved!";
+ messageElement.className="message success";
+ showSolvedModal();
+ updateBoard();
+ return true;
 }
 
-
-function getCompletedNumbers() {
-
-    const completed =
-        new Set();
-
-
-    for (let n = 1; n <= 9; n++) {
-
-        if (
-            isNumberComplete(n)
-        ) {
-
-            completed.add(n);
-        }
-    }
-
-
-    return completed;
+function checkBoard(){
+ let incorrect=0,incomplete=0;
+ for(let i=0;i<81;i++){
+  const cell=cells[i];
+  if(cell.value===0){incomplete++;continue}
+  if(cell.value!==solution[i])incorrect++;
+ }
+ if(incorrect>0){messageElement.textContent=incorrect===1?"There is 1 incorrect number.":`There are ${incorrect} incorrect numbers.`;messageElement.className="message error"}
+ else if(incomplete>0){messageElement.textContent=`${incomplete} cells remaining.`;messageElement.className="message"}
+ else checkWin();
 }
 
+function showSolvedModal(persist=true){solvedModal.classList.remove("hidden");solvedModal.setAttribute("aria-hidden","false");closeSolvedButton.focus();if(persist)saveSession()}
+function hideSolvedModal(persist=true){solvedModal.classList.add("hidden");solvedModal.setAttribute("aria-hidden","true");if(persist)saveSession()}
 
-/* -----------------------------------------------------------
-   Candidate cleanup
------------------------------------------------------------ */
-
-function removeCandidateFromPeers(
-    pos,
-    number
-) {
-
-    const row =
-        rowOf(pos);
-
-    const col =
-        colOf(pos);
-
-    const box =
-        boxOf(pos);
-
-
-    for (let i = 0; i < 81; i++) {
-
-        if (i === pos) {
-            continue;
-        }
-
-
-        if (
-            rowOf(i) === row ||
-            colOf(i) === col ||
-            boxOf(i) === box
-        ) {
-
-            cells[i].candidates.delete(
-                number
-            );
-        }
-    }
+function newGame(){
+ gameFinished=false;
+ selected=-1;
+ mistakes=0;
+ history=[];
+ currentDifficulty=difficulty;
+ mistakesElement.textContent="Mistakes: 0";
+ mistakesElement.classList.remove("visible");
+ messageElement.textContent="";
+ messageElement.className="message";
+ statusElement.textContent=difficultyName(currentDifficulty);
+ hideSolvedModal();
+ generatePuzzle();
+ createCells();
+ renderBoard();
+ updateUndoButton();
+ saveSession();
 }
 
+normalModeButton.addEventListener("click",()=>{mode="number";normalModeButton.classList.add("active");candidateModeButton.classList.remove("active");saveSession()});
+candidateModeButton.addEventListener("click",()=>{mode="candidate";candidateModeButton.classList.add("active");normalModeButton.classList.remove("active");saveSession()});
+undoButton.addEventListener("click",undo);
+newGameButton.addEventListener("click",newGame);
+document.getElementById("erase").addEventListener("click",eraseSelected);
+document.getElementById("check").addEventListener("click",checkBoard);
+closeSolvedButton.addEventListener("click",hideSolvedModal);
 
-function removeCompletedNumberCandidates(
-    number
-) {
+solvedModal.addEventListener("click",event=>{if(event.target===solvedModal)hideSolvedModal()});
 
-    for (let i = 0; i < 81; i++) {
+document.querySelectorAll("[data-difficulty]").forEach(button=>{
+ button.addEventListener("click",()=>{
+  difficulty=button.dataset.difficulty;
+  document.querySelectorAll("[data-difficulty]").forEach(b=>b.classList.remove("active"));
+  button.classList.add("active");
+  /* Changing difficulty only changes the setting for the NEXT game. */
+  saveSession();
+ });
+});
 
-        cells[i].candidates.delete(
-            number
-        );
-    }
+for(let n=1;n<=9;n++){
+ const button=document.createElement("button");
+ button.textContent=n;
+ button.dataset.number=n;
+ button.addEventListener("click",()=>placeNumber(n));
+ numberPad.appendChild(button);
 }
 
+document.addEventListener("keydown",event=>{
+ if(event.key==="Escape"&&!solvedModal.classList.contains("hidden")){hideSolvedModal();return}
+ if(gameFinished)return;
+ if(event.key>="1"&&event.key<="9"){placeNumber(Number(event.key));return}
+ if(event.key==="Backspace"||event.key==="Delete"||event.key==="0"){eraseSelected();return}
+ if(event.ctrlKey||event.metaKey){if(event.key.toLowerCase()==="z"){event.preventDefault();undo()}return}
+ if(selected===-1)return;
+ let row=rowOf(selected),col=colOf(selected);
+ switch(event.key){
+  case "ArrowUp":row=Math.max(0,row-1);break;
+  case "ArrowDown":row=Math.min(8,row+1);break;
+  case "ArrowLeft":col=Math.max(0,col-1);break;
+  case "ArrowRight":col=Math.min(8,col+1);break;
+  default:return;
+ }
+ event.preventDefault();selectCell(index(row,col));
+});
 
-function refreshCompletedNumbers() {
+window.addEventListener("beforeunload",saveSession);
 
-    for (let n = 1; n <= 9; n++) {
-
-        if (
-            isNumberComplete(n)
-        ) {
-
-            removeCompletedNumberCandidates(
-                n
-            );
-        }
-    }
+if(!loadSession()){
+ newGame();
 }
-
-
-/* -----------------------------------------------------------
-   Board update
------------------------------------------------------------ */
-
-function updateBoard() {
-
-    let selectedIsCorrect =
-        false;
-
-    let selectedValue =
-        0;
-
-
-    if (selected !== -1) {
-
-        const selectedCell =
-            cells[selected];
-
-
-        selectedValue =
-            selectedCell.value;
-
-
-        selectedIsCorrect =
-            selectedValue !== 0 &&
-            selectedValue ===
-            solution[selected];
-    }
-
-
-    for (let i = 0; i < 81; i++) {
-
-        const state =
-            cells[i];
-
-        const element =
-            state.element;
-
-
-        /*
-         * Selected cell
-         */
-        element.classList.toggle(
-            "selected",
-            i === selected
-        );
-
-
-        /*
-         * Selected row / column
-         */
-        element.classList.toggle(
-            "line-related",
-
-            selected !== -1 &&
-            i !== selected &&
-            (
-                sameRow(i, selected) ||
-                sameColumn(i, selected)
-            )
-        );
-
-
-        /*
-         * Same correct number
-         */
-        element.classList.toggle(
-            "number-match",
-
-            selectedIsCorrect &&
-            i !== selected &&
-            state.value === selectedValue &&
-            state.value === solution[i]
-        );
-
-
-        /*
-         * Given
-         */
-        element.classList.toggle(
-            "given",
-            state.given
-        );
-
-
-        /*
-         * Correct player value
-         */
-        element.classList.toggle(
-            "correct",
-
-            state.locked &&
-            !state.given
-        );
-
-
-        /*
-         * Incorrect editable value
-         */
-        element.classList.toggle(
-            "wrong",
-
-            !state.locked &&
-            !state.given &&
-            state.value !== 0 &&
-            state.value !== solution[i]
-        );
-
-
-        /*
-         * Main value
-         */
-        element.querySelector(
-            ".value"
-        ).textContent =
-            state.value === 0
-                ? ""
-                : state.value;
-
-
-        /*
-         * Candidates
-         */
-        element
-            .querySelectorAll(".candidate")
-            .forEach(candidate => {
-
-                const n =
-                    Number(
-                        candidate.dataset.number
-                    );
-
-
-                const active =
-                    state.candidates.has(n);
-
-
-                candidate.textContent =
-                    active ? n : "";
-
-
-                candidate.classList.toggle(
-                    "active",
-                    active
-                );
-            });
-    }
-
-
-    updateNumberPad();
-
-    updateUndoButton();
-}
-
-
-/* -----------------------------------------------------------
-   Number keypad state
------------------------------------------------------------ */
-
-function updateNumberPad() {
-
-    const selectedValue =
-        selected >= 0
-            ? cells[selected].value
-            : 0;
-
-
-    const selectedCandidates =
-        selected >= 0
-            ? cells[selected].candidates
-            : new Set();
-
-
-    const completed =
-        getCompletedNumbers();
-
-
-    document
-        .querySelectorAll(
-            ".number-pad button"
-        )
-        .forEach(button => {
-
-            const n =
-                Number(
-                    button.dataset.number
-                );
-
-
-            const active =
-                n === selectedValue;
-
-
-            const candidate =
-                selectedCandidates.has(n);
-
-
-            /*
-             * The button becomes gray when it is
-             * already represented in the selected cell.
-             */
-            button.classList.toggle(
-                "active-number",
-                active
-            );
-
-
-            button.classList.toggle(
-                "candidate-number",
-                candidate
-            );
-
-
-            /*
-             * Completely solved numbers are
-             * unavailable in both modes.
-             */
-            const unavailable =
-                completed.has(n);
-
-
-            button.classList.toggle(
-                "unavailable",
-                unavailable
-            );
-
-
-            button.disabled =
-                unavailable;
-
-
-            button.setAttribute(
-                "aria-disabled",
-                unavailable
-                    ? "true"
-                    : "false"
-            );
-        });
-}
-
-
-/* -----------------------------------------------------------
-   Candidates
------------------------------------------------------------ */
-
-function toggleCandidate(number) {
-
-    if (selected === -1) {
-        return;
-    }
-
-
-    const cell =
-        cells[selected];
-
-
-    /*
-     * Cannot add candidates to locked cells.
-     */
-    if (
-        cell.locked ||
-        cell.given ||
-        cell.value !== 0
-    ) {
-
-        return;
-    }
-
-
-    /*
-     * Completed number cannot be a candidate.
-     */
-    if (
-        isNumberComplete(number)
-    ) {
-
-        return;
-    }
-
-
-    pushHistory();
-
-
-    if (
-        cell.candidates.has(number)
-    ) {
-
-        cell.candidates.delete(
-            number
-        );
-
-    } else {
-
-        cell.candidates.add(
-            number
-        );
-    }
-
-
-    updateBoard();
-}
-
-
-/* -----------------------------------------------------------
-   Number placement
------------------------------------------------------------ */
-
-function placeNumber(number) {
-
-    if (
-        selected === -1 ||
-        gameFinished
-    ) {
-
-        return;
-    }
-
-
-    /*
-     * Completed number is disabled.
-     */
-    if (
-        isNumberComplete(number)
-    ) {
-
-        return;
-    }
-
-
-    const cell =
-        cells[selected];
-
-
-    /*
-     * Given and correct numbers are locked.
-     */
-    if (
-        cell.locked ||
-        cell.given
-    ) {
-
-        return;
-    }
-
-
-    /*
-     * Candidate mode
-     */
-    if (
-        mode === "candidate"
-    ) {
-
-        toggleCandidate(number);
-
-        return;
-    }
-
-
-    pushHistory();
-
-
-    /*
-     * Clicking the same editable number
-     * erases it.
-     */
-    if (
-        cell.value === number
-    ) {
-
-        cell.value = 0;
-
-        updateBoard();
-
-        return;
-    }
-
-
-    /*
-     * Enter the number.
-     */
-    cell.candidates.clear();
-
-    cell.value = number;
-
-
-    /*
-     * Correct number.
-     */
-    if (
-        number === solution[selected]
-    ) {
-
-        cell.locked = true;
-
-
-        removeCandidateFromPeers(
-            selected,
-            number
-        );
-
-
-        refreshCompletedNumbers();
-
-
-        checkWin();
-
-
-    } else {
-
-        /*
-         * Incorrect number stays editable.
-         */
-        mistakes++;
-
-
-        mistakesElement.textContent =
-            "Mistakes: " + mistakes;
-
-
-        mistakesElement.classList.add(
-            "visible"
-        );
-    }
-
-
-    updateBoard();
-}
-
-
-/* -----------------------------------------------------------
-   Erase
------------------------------------------------------------ */
-
-function eraseSelected() {
-
-    if (
-        selected === -1 ||
-        gameFinished
-    ) {
-
-        return;
-    }
-
-
-    const cell =
-        cells[selected];
-
-
-    /*
-     * Correct / given numbers cannot be erased.
-     */
-    if (
-        cell.locked ||
-        cell.given
-    ) {
-
-        return;
-    }
-
-
-    /*
-     * Nothing to erase.
-     */
-    if (
-        cell.value === 0 &&
-        cell.candidates.size === 0
-    ) {
-
-        return;
-    }
-
-
-    pushHistory();
-
-
-    cell.value = 0;
-
-    cell.candidates.clear();
-
-
-    updateBoard();
-}
-
-
-/* -----------------------------------------------------------
-   Check / win
------------------------------------------------------------ */
-
-function checkWin() {
-
-    for (let i = 0; i < 81; i++) {
-
-        if (
-            cells[i].value !== solution[i]
-        ) {
-
-            return false;
-        }
-    }
-
-
-    gameFinished = true;
-
-
-    messageElement.textContent =
-        "Puzzle solved!";
-
-    messageElement.className =
-        "message success";
-
-
-    showSolvedModal();
-
-    updateBoard();
-
-
-    return true;
-}
-
-
-function checkBoard() {
-
-    let incorrect = 0;
-    let incomplete = 0;
-
-
-    for (let i = 0; i < 81; i++) {
-
-        const cell =
-            cells[i];
-
-
-        if (
-            cell.value === 0
-        ) {
-
-            incomplete++;
-
-            continue;
-        }
-
-
-        if (
-            cell.value !== solution[i]
-        ) {
-
-            incorrect++;
-        }
-    }
-
-
-    if (incorrect > 0) {
-
-        messageElement.textContent =
-            incorrect === 1
-                ? "There is 1 incorrect number."
-                : `There are ${incorrect} incorrect numbers.`;
-
-        messageElement.className =
-            "message error";
-
-
-    } else if (incomplete > 0) {
-
-        messageElement.textContent =
-            `${incomplete} cells remaining.`;
-
-        messageElement.className =
-            "message";
-
-
-    } else {
-
-        checkWin();
-    }
-}
-
-
-/* -----------------------------------------------------------
-   Solved popup
------------------------------------------------------------ */
-
-function showSolvedModal() {
-
-    solvedModal.classList.remove(
-        "hidden"
-    );
-
-
-    solvedModal.setAttribute(
-        "aria-hidden",
-        "false"
-    );
-
-
-    closeSolvedButton.focus();
-}
-
-
-function hideSolvedModal() {
-
-    solvedModal.classList.add(
-        "hidden"
-    );
-
-
-    solvedModal.setAttribute(
-        "aria-hidden",
-        "true"
-    );
-}
-
-
-/* -----------------------------------------------------------
-   New game
------------------------------------------------------------ */
-
-function newGame() {
-
-    gameFinished = false;
-
-    selected = -1;
-
-    mistakes = 0;
-
-    history = [];
-
-    currentDifficulty =
-        difficulty;
-
-
-    mistakesElement.textContent =
-        "Mistakes: 0";
-
-
-    mistakesElement.classList.remove(
-        "visible"
-    );
-
-
-    messageElement.textContent = "";
-
-    messageElement.className =
-        "message";
-
-
-    statusElement.textContent =
-        difficultyName(
-            currentDifficulty
-        );
-
-
-    hideSolvedModal();
-
-
-    generatePuzzle();
-
-    createCells();
-
-    renderBoard();
-
-    updateUndoButton();
-}
-
-
-/* -----------------------------------------------------------
-   Mode switching
------------------------------------------------------------ */
-
-normalModeButton.addEventListener(
-    "click",
-    () => {
-
-        mode = "number";
-
-
-        normalModeButton.classList.add(
-            "active"
-        );
-
-
-        candidateModeButton.classList.remove(
-            "active"
-        );
-    }
-);
-
-
-candidateModeButton.addEventListener(
-    "click",
-    () => {
-
-        mode = "candidate";
-
-
-        candidateModeButton.classList.add(
-            "active"
-        );
-
-
-        normalModeButton.classList.remove(
-            "active"
-        );
-    }
-);
-
-
-/* -----------------------------------------------------------
-   Undo / buttons
------------------------------------------------------------ */
-
-undoButton.addEventListener(
-    "click",
-    undo
-);
-
-
-newGameButton.addEventListener(
-    "click",
-    newGame
-);
-
-
-document
-    .getElementById("erase")
-    .addEventListener(
-        "click",
-        eraseSelected
-    );
-
-
-document
-    .getElementById("check")
-    .addEventListener(
-        "click",
-        checkBoard
-    );
-
-
-closeSolvedButton.addEventListener(
-    "click",
-    hideSolvedModal
-);
-
-
-/*
- * Clicking the dark background also closes
- * the solved popup.
- */
-solvedModal.addEventListener(
-    "click",
-    event => {
-
-        if (
-            event.target === solvedModal
-        ) {
-
-            hideSolvedModal();
-        }
-    }
-);
-
-
-/* -----------------------------------------------------------
-   Difficulty
------------------------------------------------------------ */
-
-document
-    .querySelectorAll(
-        "[data-difficulty]"
-    )
-    .forEach(button => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                difficulty =
-                    button.dataset.difficulty;
-
-
-                document
-                    .querySelectorAll(
-                        "[data-difficulty]"
-                    )
-                    .forEach(b =>
-                        b.classList.remove(
-                            "active"
-                        )
-                    );
-
-
-                button.classList.add(
-                    "active"
-                );
-
-
-                /*
-                 * IMPORTANT:
-                 *
-                 * Selecting a difficulty does NOT
-                 * start a new game.
-                 *
-                 * It only changes the difficulty
-                 * that will be used the next time
-                 * New Game is pressed.
-                 */
-            }
-        );
-    });
-
-
-/* -----------------------------------------------------------
-   Number keypad
------------------------------------------------------------ */
-
-for (let n = 1; n <= 9; n++) {
-
-    const button =
-        document.createElement("button");
-
-
-    button.textContent = n;
-
-    button.dataset.number = n;
-
-
-    button.addEventListener(
-        "click",
-        () => {
-
-            placeNumber(n);
-        }
-    );
-
-
-    numberPad.appendChild(
-        button
-    );
-}
-
-
-/* -----------------------------------------------------------
-   Keyboard
------------------------------------------------------------ */
-
-document.addEventListener(
-    "keydown",
-    event => {
-
-        /*
-         * Escape closes the solved popup.
-         */
-        if (
-            event.key === "Escape" &&
-            !solvedModal.classList.contains(
-                "hidden"
-            )
-        ) {
-
-            hideSolvedModal();
-
-            return;
-        }
-
-
-        /*
-         * Prevent normal gameplay input
-         * after the puzzle is solved.
-         */
-        if (gameFinished) {
-            return;
-        }
-
-
-        /*
-         * Number keys.
-         */
-        if (
-            event.key >= "1" &&
-            event.key <= "9"
-        ) {
-
-            placeNumber(
-                Number(event.key)
-            );
-
-            return;
-        }
-
-
-        /*
-         * Erase.
-         */
-        if (
-            event.key === "Backspace" ||
-            event.key === "Delete" ||
-            event.key === "0"
-        ) {
-
-            eraseSelected();
-
-            return;
-        }
-
-
-        /*
-         * Undo.
-         */
-        if (
-            event.ctrlKey ||
-            event.metaKey
-        ) {
-
-            if (
-                event.key.toLowerCase() === "z"
-            ) {
-
-                event.preventDefault();
-
-                undo();
-            }
-
-            return;
-        }
-
-
-        if (selected === -1) {
-            return;
-        }
-
-
-        let row =
-            rowOf(selected);
-
-        let col =
-            colOf(selected);
-
-
-        switch (event.key) {
-
-            case "ArrowUp":
-
-                row =
-                    Math.max(
-                        0,
-                        row - 1
-                    );
-
-                break;
-
-
-            case "ArrowDown":
-
-                row =
-                    Math.min(
-                        8,
-                        row + 1
-                    );
-
-                break;
-
-
-            case "ArrowLeft":
-
-                col =
-                    Math.max(
-                        0,
-                        col - 1
-                    );
-
-                break;
-
-
-            case "ArrowRight":
-
-                col =
-                    Math.min(
-                        8,
-                        col + 1
-                    );
-
-                break;
-
-
-            default:
-                return;
-        }
-
-
-        event.preventDefault();
-
-
-        selectCell(
-            index(row, col)
-        );
-    }
-);
-
-
-/* -----------------------------------------------------------
-   Start
------------------------------------------------------------ */
-
-newGame();
-
 </script>
-
 </body>
 </html>
