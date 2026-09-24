@@ -6,390 +6,582 @@
 <title>Sudoku</title>
 
 <style>
-    * {
-        box-sizing: border-box;
-    }
+* {
+    box-sizing: border-box;
+}
 
-    :root {
-        --bg: #111214;
-        --panel: #191b1f;
-        --panel2: #202328;
+:root {
+    --bg: #111214;
+    --panel: #191b1f;
+    --panel2: #202328;
 
-        --cell: #181a1e;
-        --cell-related: #292d33;
-        --cell-selected: #3a3f47;
-        --cell-match: #34302a;
+    --cell: #181a1e;
+    --cell-related: #292d33;
+    --cell-selected: #3a3f47;
+    --cell-match: #34302a;
 
-        --given: #d9dde4;
-        --text: #e8eaed;
-        --muted: #7f858f;
+    --given: #d9dde4;
+    --text: #e8eaed;
+    --muted: #7f858f;
 
-        --accent: #d98b3a;
-        --correct: #74c69d;
-        --wrong: #e06c75;
+    --accent: #d98b3a;
+    --correct: #74c69d;
+    --wrong: #e06c75;
 
-        --candidate-highlight: #34383f;
-        --candidate-border: #5b616b;
+    --candidate: #34383f;
+    --candidate-border: #5b616b;
 
-        --border: #3b3f46;
-        --major-border: #777d87;
-    }
+    --unavailable: #282b30;
+    --unavailable-text: #636872;
 
-    body {
-        margin: 0;
-        min-height: 100vh;
-        background: var(--bg);
-        color: var(--text);
+    --border: #3b3f46;
+    --major-border: #777d87;
+}
 
-        font-family:
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
 
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
+    font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
 
-    .game {
-        width: min(94vw, 560px);
-        padding: 24px 16px 28px;
-    }
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.game {
+    width: min(94vw, 560px);
+    padding: 18px 16px 28px;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+h1 {
+    font-size: 26px;
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    flex: 1;
+}
+
+.top-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.difficulty {
+    display: flex;
+    gap: 4px;
+    background: var(--panel);
+    padding: 4px;
+    border-radius: 8px;
+}
+
+.difficulty button {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+
+    padding: 6px 8px;
+    border-radius: 5px;
+
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.difficulty button.active {
+    background: var(--accent);
+    color: #111;
+}
+
+.new-game-top {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #111;
+
+    border-radius: 7px;
+    padding: 8px 12px;
+
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.new-game-top:hover {
+    filter: brightness(1.08);
+}
+
+.info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    margin-bottom: 12px;
+
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.mistakes {
+    color: var(--wrong);
+    opacity: 0;
+    transition: opacity .2s;
+}
+
+.mistakes.visible {
+    opacity: 1;
+}
+
+
+/* -----------------------------------------------------------
+   Board
+----------------------------------------------------------- */
+
+.board {
+    width: min(92vw, 520px);
+    aspect-ratio: 1;
+    margin: auto;
+
+    display: grid;
+
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+
+    background: var(--major-border);
+    border: 2px solid var(--major-border);
+
+    gap: 1px;
+}
+
+.cell {
+    position: relative;
+
+    min-width: 0;
+    min-height: 0;
+
+    background: var(--cell);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    cursor: pointer;
+    user-select: none;
+
+    transition:
+        background-color 0.08s ease,
+        box-shadow 0.08s ease;
+}
+
+
+/*
+ * Selected cell's row and column.
+ */
+.cell.line-related {
+    background: var(--cell-related);
+}
+
+
+/*
+ * Selected cell.
+ */
+.cell.selected {
+    background: var(--cell-selected);
+}
+
+
+/*
+ * Other cells containing the same correct
+ * number as the selected correct cell.
+ */
+.cell.number-match {
+    background: var(--cell-match);
+}
+
+
+/*
+ * Stronger selected-cell indication.
+ */
+.cell.selected.number-match {
+    background: var(--cell-selected);
+
+    box-shadow:
+        inset 0 0 0 2px var(--accent);
+}
+
+
+/*
+ * Only the boundaries between 3x3 boxes
+ * get a thick line.
+ */
+.cell.box-right {
+    border-right: 2px solid var(--major-border);
+}
+
+.cell.box-bottom {
+    border-bottom: 2px solid var(--major-border);
+}
+
+
+.cell.given {
+    color: var(--given);
+    font-weight: 600;
+}
+
+.cell.correct {
+    color: var(--correct);
+    font-weight: 600;
+    cursor: default;
+}
+
+.cell.wrong {
+    color: var(--wrong);
+    font-weight: 600;
+}
+
+
+/* -----------------------------------------------------------
+   Values and candidates
+----------------------------------------------------------- */
+
+.value {
+    font-size: clamp(22px, 6vw, 34px);
+    line-height: 1;
+
+    position: relative;
+    z-index: 2;
+}
+
+
+/*
+ * Candidate grid occupies the whole cell.
+ */
+.candidates {
+    position: absolute;
+    inset: 0;
+
+    display: grid;
+
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+
+    pointer-events: none;
+}
+
+
+/*
+ * Large candidates.
+ */
+.candidate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    color: #aeb4bd;
+
+    font-size: clamp(11px, 3vw, 17px);
+    line-height: 0.8;
+    font-weight: 500;
+
+    transform: scale(1.05);
+}
+
+
+/* -----------------------------------------------------------
+   Controls
+----------------------------------------------------------- */
+
+.controls {
+    margin-top: 18px;
+}
+
+.mode {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+
+    margin-bottom: 12px;
+}
+
+.mode button,
+.action {
+    border: 1px solid var(--border);
+
+    background: var(--panel);
+    color: var(--text);
+
+    border-radius: 7px;
+    padding: 9px 14px;
+
+    cursor: pointer;
+}
+
+.mode button.active {
+    background: var(--accent);
+    color: #111;
+    border-color: var(--accent);
+}
+
+
+/* -----------------------------------------------------------
+   Number keypad
+----------------------------------------------------------- */
+
+.number-pad {
+    display: grid;
+
+    grid-template-columns: repeat(9, 1fr);
+
+    gap: 6px;
+}
+
+.number-pad button {
+    height: 42px;
+
+    border: 1px solid var(--border);
+
+    background: var(--panel);
+    color: var(--text);
+
+    border-radius: 6px;
+
+    font-size: 17px;
+    cursor: pointer;
+
+    transition:
+        background-color 0.08s,
+        border-color 0.08s,
+        color 0.08s;
+}
+
+.number-pad button:hover:not(:disabled),
+.action:hover,
+.mode button:hover {
+    background: var(--panel2);
+}
+
+
+/*
+ * Number or candidate already represented
+ * in the selected cell.
+ *
+ * It becomes gray rather than orange.
+ */
+.number-pad button.active-number,
+.number-pad button.candidate-number {
+    background: var(--candidate);
+    border-color: var(--candidate-border);
+    color: #fff;
+}
+
+
+/*
+ * A completed number can no longer be entered
+ * as either a normal value or a candidate.
+ */
+.number-pad button.unavailable {
+    background: var(--unavailable);
+    border-color: #30343a;
+    color: var(--unavailable-text);
+
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.number-pad button.unavailable:hover {
+    background: var(--unavailable);
+}
+
+
+/* -----------------------------------------------------------
+   Bottom buttons
+----------------------------------------------------------- */
+
+.bottom-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+
+    margin-top: 12px;
+}
+
+.action {
+    min-width: 94px;
+}
+
+.action:disabled {
+    background: var(--unavailable);
+    border-color: #30343a;
+    color: var(--unavailable-text);
+
+    cursor: not-allowed;
+}
+
+
+/* -----------------------------------------------------------
+   Message
+----------------------------------------------------------- */
+
+.message {
+    text-align: center;
+
+    min-height: 22px;
+    margin-top: 12px;
+
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.message.success {
+    color: var(--correct);
+}
+
+.message.error {
+    color: var(--wrong);
+}
+
+
+/* -----------------------------------------------------------
+   Solved popup
+----------------------------------------------------------- */
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.68);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    z-index: 100;
+
+    opacity: 1;
+
+    transition: opacity 0.15s ease;
+}
+
+.modal-backdrop.hidden {
+    display: none;
+}
+
+.modal {
+    width: min(86vw, 320px);
+
+    background: var(--panel);
+
+    border: 1px solid var(--border);
+    border-radius: 12px;
+
+    padding: 28px 24px 22px;
+
+    text-align: center;
+
+    box-shadow:
+        0 18px 60px rgba(0, 0, 0, 0.45);
+}
+
+.modal h2 {
+    margin: 0 0 18px;
+
+    font-size: 28px;
+    font-weight: 600;
+
+    text-transform: lowercase;
+}
+
+.modal button {
+    min-width: 100px;
+
+    border: 1px solid var(--accent);
+
+    background: var(--accent);
+    color: #111;
+
+    border-radius: 7px;
+    padding: 9px 16px;
+
+    cursor: pointer;
+    font-weight: 600;
+}
+
+
+/* -----------------------------------------------------------
+   Mobile
+----------------------------------------------------------- */
+
+@media (max-width: 700px) {
 
     header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 18px;
+        align-items: flex-start;
     }
 
-    h1 {
-        font-size: 26px;
-        margin: 0;
-        font-weight: 600;
-        letter-spacing: 0.5px;
+    .top-controls {
+        flex-wrap: wrap;
+        justify-content: flex-end;
     }
 
     .difficulty {
-        display: flex;
-        gap: 5px;
-        background: var(--panel);
-        padding: 4px;
-        border-radius: 8px;
+        order: 2;
+    }
+
+    .new-game-top {
+        order: 1;
+    }
+}
+
+@media (max-width: 420px) {
+
+    .game {
+        padding: 12px 8px 20px;
+    }
+
+    header {
+        gap: 8px;
+    }
+
+    .top-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .difficulty {
+        flex: 1;
     }
 
     .difficulty button {
-        border: 0;
-        background: transparent;
-        color: var(--muted);
-        padding: 6px 9px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 12px;
+        flex: 1;
+        padding: 6px 5px;
     }
 
-    .difficulty button.active {
-        background: var(--accent);
-        color: #111;
-    }
-
-    .info {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-        color: var(--muted);
-        font-size: 13px;
-    }
-
-    .mistakes {
-        color: var(--wrong);
-        opacity: 0;
-        transition: opacity .2s;
-    }
-
-    .mistakes.visible {
-        opacity: 1;
-    }
-
-    .board {
-        width: min(92vw, 520px);
-        aspect-ratio: 1;
-        margin: auto;
-
-        display: grid;
-        grid-template-columns: repeat(9, 1fr);
-        grid-template-rows: repeat(9, 1fr);
-
-        background: var(--major-border);
-        border: 2px solid var(--major-border);
-        gap: 1px;
-    }
-
-    .cell {
-        position: relative;
-        min-width: 0;
-        min-height: 0;
-
-        background: var(--cell);
-
-        display: flex;
-        justify-content: center;
-        align-items: center;
-
-        cursor: pointer;
-        user-select: none;
-
-        transition:
-            background-color 0.08s ease,
-            box-shadow 0.08s ease;
-    }
-
-    /*
-     * Selected cell's row and column.
-     * Deliberately excludes the 3x3 box.
-     */
-    .cell.line-related {
-        background: var(--cell-related);
-    }
-
-    /*
-     * Currently selected cell.
-     */
-    .cell.selected {
-        background: var(--cell-selected);
-    }
-
-    /*
-     * Other correct cells containing the same
-     * correct number as the selected cell.
-     */
-    .cell.number-match {
-        background: var(--cell-match);
-    }
-
-    /*
-     * Selected cell gets a stronger border when
-     * it is also a matching correct number.
-     */
-    .cell.selected.number-match {
-        background: var(--cell-selected);
-        box-shadow: inset 0 0 0 2px var(--accent);
-    }
-
-    .cell.given {
-        color: var(--given);
-        font-weight: 600;
-    }
-
-    .cell.correct {
-        color: var(--correct);
-        font-weight: 600;
-        cursor: default;
-    }
-
-    .cell.wrong {
-        color: var(--wrong);
-        font-weight: 600;
-    }
-
-    /*
-     * 3x3 box boundaries
-     */
-
-    .cell:nth-child(3n) {
-        border-right: 2px solid var(--major-border);
-    }
-
-    .cell:nth-child(9n) {
-        border-right: 0;
-    }
-
-    .cell:nth-child(n+19):nth-child(-n+27),
-    .cell:nth-child(n+46):nth-child(-n+54) {
-        border-bottom: 2px solid var(--major-border);
-    }
-
-    .cell:nth-child(n+55):nth-child(-n+63) {
-        border-bottom: 2px solid var(--major-border);
-    }
-
-    /*
-     * Main cell number.
-     */
-    .value {
-        font-size: clamp(22px, 6vw, 34px);
-        line-height: 1;
-        position: relative;
-        z-index: 2;
-    }
-
-    /*
-     * Candidate grid.
-     *
-     * It occupies the entire cell.
-     */
-    .candidates {
-        position: absolute;
-        inset: 0;
-
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        grid-template-rows: repeat(3, 1fr);
-
-        pointer-events: none;
-    }
-
-    /*
-     * Candidate numbers are intentionally large.
-     */
-    .candidate {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        color: #aeb4bd;
-
-        font-size: clamp(11px, 3vw, 17px);
-        line-height: 0.8;
-        font-weight: 500;
-
-        transform: scale(1.05);
-    }
-
-    .controls {
-        margin-top: 18px;
-    }
-
-    .mode {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        margin-bottom: 12px;
-    }
-
-    .mode button,
-    .action {
-        border: 1px solid var(--border);
-        background: var(--panel);
-        color: var(--text);
-        border-radius: 7px;
-        padding: 9px 14px;
-        cursor: pointer;
-    }
-
-    .mode button.active {
-        background: var(--accent);
-        color: #111;
-        border-color: var(--accent);
+    .new-game-top {
+        padding: 8px 10px;
     }
 
     .number-pad {
-        display: grid;
-        grid-template-columns: repeat(9, 1fr);
-        gap: 6px;
+        gap: 4px;
     }
 
     .number-pad button {
-        height: 42px;
-
-        border: 1px solid var(--border);
-        background: var(--panel);
-        color: var(--text);
-
-        border-radius: 6px;
-        font-size: 17px;
-        cursor: pointer;
-
-        transition:
-            background-color 0.08s ease,
-            border-color 0.08s ease,
-            color 0.08s ease;
+        height: 38px;
     }
-
-    .number-pad button:hover,
-    .action:hover,
-    .mode button:hover {
-        background: var(--panel2);
-    }
-
-    /*
-     * Actual number currently present in the selected cell.
-     */
-    .number-pad button.active-number {
-        background: var(--accent);
-        color: #111;
-        border-color: var(--accent);
-    }
-
-    /*
-     * Candidate currently written in the selected cell.
-     */
-    .number-pad button.candidate-number {
-        background: var(--candidate-highlight);
-        border-color: var(--candidate-border);
-        color: #ffffff;
-    }
-
-    /*
-     * Actual selected value takes precedence over
-     * candidate highlighting.
-     */
-    .number-pad button.active-number.candidate-number {
-        background: var(--accent);
-        color: #111;
-        border-color: var(--accent);
-    }
-
-    .bottom-actions {
-        display: flex;
-        gap: 8px;
-        justify-content: center;
-        margin-top: 12px;
-    }
-
-    .action {
-        min-width: 100px;
-    }
-
-    .message {
-        text-align: center;
-        min-height: 22px;
-        margin-top: 12px;
-
-        font-size: 14px;
-        color: var(--muted);
-    }
-
-    .message.success {
-        color: var(--correct);
-    }
-
-    .message.error {
-        color: var(--wrong);
-    }
-
-    @media (max-width: 420px) {
-
-        .game {
-            padding: 15px 8px 20px;
-        }
-
-        header {
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .number-pad {
-            gap: 4px;
-        }
-
-        .number-pad button {
-            height: 38px;
-        }
-    }
+}
 </style>
 </head>
 
@@ -398,58 +590,153 @@
 <div class="game">
 
     <header>
+
         <h1>Sudoku</h1>
 
-        <div class="difficulty">
-            <button data-difficulty="easy">Easy</button>
-            <button data-difficulty="medium" class="active">Medium</button>
-            <button data-difficulty="hard">Hard</button>
-            <button data-difficulty="expert">Expert</button>
+        <div class="top-controls">
+
+            <div class="difficulty">
+
+                <button data-difficulty="easy">
+                    Easy
+                </button>
+
+                <button
+                    data-difficulty="medium"
+                    class="active"
+                >
+                    Medium
+                </button>
+
+                <button data-difficulty="hard">
+                    Hard
+                </button>
+
+                <button data-difficulty="expert">
+                    Expert
+                </button>
+
+            </div>
+
+            <button
+                class="new-game-top"
+                id="newGame"
+            >
+                New Game
+            </button>
+
         </div>
+
     </header>
 
+
     <div class="info">
-        <span id="status">Medium</span>
-        <span id="mistakes" class="mistakes">Mistakes: 0</span>
+
+        <span id="status">
+            Medium
+        </span>
+
+        <span
+            id="mistakes"
+            class="mistakes"
+        >
+            Mistakes: 0
+        </span>
+
     </div>
 
-    <div id="board" class="board"></div>
+
+    <div
+        id="board"
+        class="board"
+    ></div>
+
 
     <div class="controls">
 
         <div class="mode">
-            <button id="normalMode" class="active">
+
+            <button
+                id="normalMode"
+                class="active"
+            >
                 Number
             </button>
 
             <button id="candidateMode">
                 Candidates
             </button>
+
         </div>
 
-        <div id="numberPad" class="number-pad"></div>
+
+        <div
+            id="numberPad"
+            class="number-pad"
+        ></div>
+
 
         <div class="bottom-actions">
 
-            <button class="action" id="erase">
+            <button
+                class="action"
+                id="undo"
+            >
+                Undo
+            </button>
+
+            <button
+                class="action"
+                id="erase"
+            >
                 Erase
             </button>
 
-            <button class="action" id="newGame">
-                New Game
-            </button>
-
-            <button class="action" id="check">
+            <button
+                class="action"
+                id="check"
+            >
                 Check
             </button>
 
         </div>
 
-        <div id="message" class="message"></div>
+
+        <div
+            id="message"
+            class="message"
+        ></div>
 
     </div>
 
 </div>
+
+
+<div
+    id="solvedModal"
+    class="modal-backdrop hidden"
+    aria-hidden="true"
+>
+
+    <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="solvedTitle"
+    >
+
+        <h2 id="solvedTitle">
+            Solved
+        </h2>
+
+        <button id="closeSolved">
+            Close
+        </button>
+
+    </div>
+
+</div>
+
 
 <script>
 "use strict";
@@ -480,6 +767,18 @@ const normalModeButton =
 const candidateModeButton =
     document.getElementById("candidateMode");
 
+const undoButton =
+    document.getElementById("undo");
+
+const newGameButton =
+    document.getElementById("newGame");
+
+const solvedModal =
+    document.getElementById("solvedModal");
+
+const closeSolvedButton =
+    document.getElementById("closeSolved");
+
 
 /* -----------------------------------------------------------
    Game state
@@ -494,10 +793,13 @@ let selected = -1;
 let mode = "number";
 
 let difficulty = "medium";
+let currentDifficulty = "medium";
 
 let mistakes = 0;
 
 let gameFinished = false;
+
+let history = [];
 
 
 /* -----------------------------------------------------------
@@ -551,8 +853,17 @@ function boxOf(i) {
 }
 
 
+function difficultyName(d) {
+
+    return (
+        d.charAt(0).toUpperCase() +
+        d.slice(1)
+    );
+}
+
+
 /* -----------------------------------------------------------
-   Sudoku validation / solver
+   Sudoku validation
 ----------------------------------------------------------- */
 
 function isValid(board, pos, num) {
@@ -574,6 +885,7 @@ function isValid(board, pos, num) {
         if (
             board[index(row, c)] === num
         ) {
+
             return false;
         }
     }
@@ -586,12 +898,13 @@ function isValid(board, pos, num) {
         if (
             board[index(r, col)] === num
         ) {
+
             return false;
         }
     }
 
 
-    /* 3x3 box */
+    /* Box */
 
     for (
         let r = boxRow;
@@ -608,6 +921,7 @@ function isValid(board, pos, num) {
             if (
                 board[index(r, c)] === num
             ) {
+
                 return false;
             }
         }
@@ -616,6 +930,10 @@ function isValid(board, pos, num) {
     return true;
 }
 
+
+/* -----------------------------------------------------------
+   Solver
+----------------------------------------------------------- */
 
 function solve(board) {
 
@@ -638,6 +956,7 @@ function solve(board) {
             if (
                 isValid(board, i, n)
             ) {
+
                 candidates.push(n);
             }
         }
@@ -657,7 +976,11 @@ function solve(board) {
             bestCandidates = candidates;
             bestPos = i;
 
-            if (candidates.length === 1) {
+
+            if (
+                candidates.length === 1
+            ) {
+
                 break;
             }
         }
@@ -699,6 +1022,10 @@ function generateSolution() {
     return board;
 }
 
+
+/* -----------------------------------------------------------
+   Solution counter
+----------------------------------------------------------- */
 
 function countSolutions(
     board,
@@ -776,6 +1103,7 @@ function countSolutions(
             if (count >= limit) {
 
                 board[bestPos] = 0;
+
                 return;
             }
         }
@@ -805,7 +1133,6 @@ function generatePuzzle() {
 
 
     const targets = {
-
         easy: 40,
         medium: 48,
         hard: 54,
@@ -833,6 +1160,7 @@ function generatePuzzle() {
         if (
             removed >= targetRemoved
         ) {
+
             break;
         }
 
@@ -863,7 +1191,7 @@ function generatePuzzle() {
 
 
 /* -----------------------------------------------------------
-   Cell state
+   Cells
 ----------------------------------------------------------- */
 
 function createCells() {
@@ -894,7 +1222,7 @@ function createCells() {
 
 
 /* -----------------------------------------------------------
-   Row / column relationships
+   Relationships
 ----------------------------------------------------------- */
 
 function sameRow(a, b) {
@@ -923,7 +1251,7 @@ function relatedCells(a, b) {
 
 
 /* -----------------------------------------------------------
-   Board creation
+   Board rendering
 ----------------------------------------------------------- */
 
 function renderBoard() {
@@ -940,17 +1268,41 @@ function renderBoard() {
 
 
         /*
-         * Main displayed value
+         * Thick vertical boundaries only at
+         * the boundaries of 3x3 boxes.
          */
+        if (
+            colOf(i) === 2 ||
+            colOf(i) === 5
+        ) {
+
+            cell.classList.add(
+                "box-right"
+            );
+        }
+
+
+        /*
+         * Thick horizontal boundaries only at
+         * the boundaries of 3x3 boxes.
+         */
+        if (
+            rowOf(i) === 2 ||
+            rowOf(i) === 5
+        ) {
+
+            cell.classList.add(
+                "box-bottom"
+            );
+        }
+
+
         const value =
             document.createElement("div");
 
         value.className = "value";
 
 
-        /*
-         * Candidate mini-grid
-         */
         const candidates =
             document.createElement("div");
 
@@ -970,18 +1322,20 @@ function renderBoard() {
                 n;
 
             /*
-             * IMPORTANT:
-             * Candidate numbers start empty.
-             * They only appear when explicitly entered.
+             * Candidate starts empty.
              */
             candidate.textContent = "";
 
-            candidates.appendChild(candidate);
+            candidates.appendChild(
+                candidate
+            );
         }
 
 
-        cell.appendChild(value);
-        cell.appendChild(candidates);
+        cell.append(
+            value,
+            candidates
+        );
 
 
         cell.addEventListener(
@@ -990,13 +1344,262 @@ function renderBoard() {
         );
 
 
-        cells[i].element = cell;
+        cells[i].element =
+            cell;
 
-        boardElement.appendChild(cell);
+        boardElement.appendChild(
+            cell
+        );
     }
 
 
     updateBoard();
+}
+
+
+/* -----------------------------------------------------------
+   Undo snapshots
+----------------------------------------------------------- */
+
+function snapshot() {
+
+    return {
+
+        cells:
+            cells.map(cell => ({
+
+                value:
+                    cell.value,
+
+                locked:
+                    cell.locked,
+
+                candidates:
+                    [...cell.candidates]
+
+            })),
+
+        mistakes,
+        gameFinished
+    };
+}
+
+
+function pushHistory() {
+
+    history.push(
+        snapshot()
+    );
+
+
+    if (history.length > 200) {
+
+        history.shift();
+    }
+
+
+    updateUndoButton();
+}
+
+
+function restoreSnapshot(state) {
+
+    state.cells.forEach(
+        (saved, i) => {
+
+            cells[i].value =
+                saved.value;
+
+            cells[i].locked =
+                saved.locked;
+
+            cells[i].candidates =
+                new Set(saved.candidates);
+        }
+    );
+
+
+    mistakes =
+        state.mistakes;
+
+    gameFinished =
+        state.gameFinished;
+
+
+    hideSolvedModal();
+
+
+    messageElement.textContent = "";
+
+    messageElement.className =
+        "message";
+
+
+    updateBoard();
+
+    updateUndoButton();
+}
+
+
+function undo() {
+
+    if (history.length === 0) {
+        return;
+    }
+
+
+    const state =
+        history.pop();
+
+
+    restoreSnapshot(state);
+}
+
+
+function updateUndoButton() {
+
+    undoButton.disabled =
+        history.length === 0;
+}
+
+
+/* -----------------------------------------------------------
+   Cell selection
+----------------------------------------------------------- */
+
+function selectCell(i) {
+
+    if (gameFinished) {
+        return;
+    }
+
+
+    selected = i;
+
+    updateBoard();
+}
+
+
+/* -----------------------------------------------------------
+   Completed numbers
+----------------------------------------------------------- */
+
+function isNumberComplete(number) {
+
+    let count = 0;
+
+
+    for (let i = 0; i < 81; i++) {
+
+        if (
+            solution[i] === number
+        ) {
+
+            if (
+                cells[i].value === number &&
+                (
+                    cells[i].given ||
+                    cells[i].locked
+                )
+            ) {
+
+                count++;
+            }
+        }
+    }
+
+
+    return count === 9;
+}
+
+
+function getCompletedNumbers() {
+
+    const completed =
+        new Set();
+
+
+    for (let n = 1; n <= 9; n++) {
+
+        if (
+            isNumberComplete(n)
+        ) {
+
+            completed.add(n);
+        }
+    }
+
+
+    return completed;
+}
+
+
+/* -----------------------------------------------------------
+   Candidate cleanup
+----------------------------------------------------------- */
+
+function removeCandidateFromPeers(
+    pos,
+    number
+) {
+
+    const row =
+        rowOf(pos);
+
+    const col =
+        colOf(pos);
+
+    const box =
+        boxOf(pos);
+
+
+    for (let i = 0; i < 81; i++) {
+
+        if (i === pos) {
+            continue;
+        }
+
+
+        if (
+            rowOf(i) === row ||
+            colOf(i) === col ||
+            boxOf(i) === box
+        ) {
+
+            cells[i].candidates.delete(
+                number
+            );
+        }
+    }
+}
+
+
+function removeCompletedNumberCandidates(
+    number
+) {
+
+    for (let i = 0; i < 81; i++) {
+
+        cells[i].candidates.delete(
+            number
+        );
+    }
+}
+
+
+function refreshCompletedNumbers() {
+
+    for (let n = 1; n <= 9; n++) {
+
+        if (
+            isNumberComplete(n)
+        ) {
+
+            removeCompletedNumberCandidates(
+                n
+            );
+        }
+    }
 }
 
 
@@ -1006,14 +1609,13 @@ function renderBoard() {
 
 function updateBoard() {
 
-    let selectedIsCorrect = false;
-    let selectedValue = 0;
+    let selectedIsCorrect =
+        false;
+
+    let selectedValue =
+        0;
 
 
-    /*
-     * Determine whether the selected cell has
-     * a correct number.
-     */
     if (selected !== -1) {
 
         const selectedCell =
@@ -1026,7 +1628,8 @@ function updateBoard() {
 
         selectedIsCorrect =
             selectedValue !== 0 &&
-            selectedValue === solution[selected];
+            selectedValue ===
+            solution[selected];
     }
 
 
@@ -1051,39 +1654,33 @@ function updateBoard() {
         /*
          * Selected row / column
          */
-        const lineRelated =
+        element.classList.toggle(
+            "line-related",
+
             selected !== -1 &&
             i !== selected &&
             (
                 sameRow(i, selected) ||
                 sameColumn(i, selected)
-            );
-
-
-        element.classList.toggle(
-            "line-related",
-            lineRelated
+            )
         );
 
 
         /*
          * Same correct number
          */
-        const numberMatch =
+        element.classList.toggle(
+            "number-match",
+
             selectedIsCorrect &&
             i !== selected &&
             state.value === selectedValue &&
-            state.value === solution[i];
-
-
-        element.classList.toggle(
-            "number-match",
-            numberMatch
+            state.value === solution[i]
         );
 
 
         /*
-         * Given puzzle number
+         * Given
          */
         element.classList.toggle(
             "given",
@@ -1092,20 +1689,22 @@ function updateBoard() {
 
 
         /*
-         * Correct player number
+         * Correct player value
          */
         element.classList.toggle(
             "correct",
+
             state.locked &&
             !state.given
         );
 
 
         /*
-         * Incorrect editable number
+         * Incorrect editable value
          */
         element.classList.toggle(
             "wrong",
+
             !state.locked &&
             !state.given &&
             state.value !== 0 &&
@@ -1114,13 +1713,11 @@ function updateBoard() {
 
 
         /*
-         * Main number
+         * Main value
          */
-        const valueElement =
-            element.querySelector(".value");
-
-
-        valueElement.textContent =
+        element.querySelector(
+            ".value"
+        ).textContent =
             state.value === 0
                 ? ""
                 : state.value;
@@ -1129,14 +1726,9 @@ function updateBoard() {
         /*
          * Candidates
          */
-        const candidateElements =
-            element.querySelectorAll(
-                ".candidate"
-            );
-
-
-        candidateElements.forEach(
-            candidate => {
+        element
+            .querySelectorAll(".candidate")
+            .forEach(candidate => {
 
                 const n =
                     Number(
@@ -1148,10 +1740,6 @@ function updateBoard() {
                     state.candidates.has(n);
 
 
-                /*
-                 * ONLY explicitly entered
-                 * candidates get text.
-                 */
                 candidate.textContent =
                     active ? n : "";
 
@@ -1160,38 +1748,36 @@ function updateBoard() {
                     "active",
                     active
                 );
-            }
-        );
+            });
     }
 
 
     updateNumberPad();
+
+    updateUndoButton();
 }
 
 
 /* -----------------------------------------------------------
-   Number pad update
+   Number keypad state
 ----------------------------------------------------------- */
 
 function updateNumberPad() {
 
-    /*
-     * Actual number currently in selected cell.
-     */
     const selectedValue =
         selected >= 0
             ? cells[selected].value
             : 0;
 
 
-    /*
-     * Candidates explicitly entered into
-     * the selected cell.
-     */
     const selectedCandidates =
         selected >= 0
             ? cells[selected].candidates
             : new Set();
+
+
+    const completed =
+        getCompletedNumbers();
 
 
     document
@@ -1206,45 +1792,60 @@ function updateNumberPad() {
                 );
 
 
+            const active =
+                n === selectedValue;
+
+
+            const candidate =
+                selectedCandidates.has(n);
+
+
             /*
-             * Actual cell value
+             * The button becomes gray when it is
+             * already represented in the selected cell.
              */
             button.classList.toggle(
                 "active-number",
-                n === selectedValue
+                active
+            );
+
+
+            button.classList.toggle(
+                "candidate-number",
+                candidate
             );
 
 
             /*
-             * Candidate in selected cell
+             * Completely solved numbers are
+             * unavailable in both modes.
              */
+            const unavailable =
+                completed.has(n);
+
+
             button.classList.toggle(
-                "candidate-number",
-                selectedCandidates.has(n)
+                "unavailable",
+                unavailable
+            );
+
+
+            button.disabled =
+                unavailable;
+
+
+            button.setAttribute(
+                "aria-disabled",
+                unavailable
+                    ? "true"
+                    : "false"
             );
         });
 }
 
 
 /* -----------------------------------------------------------
-   Selection
------------------------------------------------------------ */
-
-function selectCell(i) {
-
-    if (gameFinished) {
-        return;
-    }
-
-
-    selected = i;
-
-    updateBoard();
-}
-
-
-/* -----------------------------------------------------------
-   Candidate handling
+   Candidates
 ----------------------------------------------------------- */
 
 function toggleCandidate(number) {
@@ -1259,73 +1860,49 @@ function toggleCandidate(number) {
 
 
     /*
-     * Locked / given cells cannot have candidates.
+     * Cannot add candidates to locked cells.
      */
     if (
         cell.locked ||
-        cell.given
+        cell.given ||
+        cell.value !== 0
     ) {
+
         return;
     }
 
 
     /*
-     * Candidates are only allowed in
-     * an otherwise empty cell.
+     * Completed number cannot be a candidate.
      */
-    if (cell.value !== 0) {
+    if (
+        isNumberComplete(number)
+    ) {
+
         return;
     }
+
+
+    pushHistory();
 
 
     if (
         cell.candidates.has(number)
     ) {
 
-        cell.candidates.delete(number);
+        cell.candidates.delete(
+            number
+        );
 
     } else {
 
-        cell.candidates.add(number);
+        cell.candidates.add(
+            number
+        );
     }
 
 
     updateBoard();
-}
-
-
-/* -----------------------------------------------------------
-   Candidate removal after correct placement
------------------------------------------------------------ */
-
-function removeCandidateFromPeers(
-    pos,
-    number
-) {
-
-    const row = rowOf(pos);
-    const col = colOf(pos);
-    const box = boxOf(pos);
-
-
-    for (let i = 0; i < 81; i++) {
-
-        if (i === pos) {
-            continue;
-        }
-
-
-        if (
-            rowOf(i) === row ||
-            colOf(i) === col ||
-            boxOf(i) === box
-        ) {
-
-            cells[i].candidates.delete(
-                number
-            );
-        }
-    }
 }
 
 
@@ -1339,6 +1916,18 @@ function placeNumber(number) {
         selected === -1 ||
         gameFinished
     ) {
+
+        return;
+    }
+
+
+    /*
+     * Completed number is disabled.
+     */
+    if (
+        isNumberComplete(number)
+    ) {
+
         return;
     }
 
@@ -1348,12 +1937,13 @@ function placeNumber(number) {
 
 
     /*
-     * Correct and given numbers are locked.
+     * Given and correct numbers are locked.
      */
     if (
         cell.locked ||
         cell.given
     ) {
+
         return;
     }
 
@@ -1361,7 +1951,9 @@ function placeNumber(number) {
     /*
      * Candidate mode
      */
-    if (mode === "candidate") {
+    if (
+        mode === "candidate"
+    ) {
 
         toggleCandidate(number);
 
@@ -1369,9 +1961,12 @@ function placeNumber(number) {
     }
 
 
+    pushHistory();
+
+
     /*
-     * Clicking the current editable number
-     * again erases it.
+     * Clicking the same editable number
+     * erases it.
      */
     if (
         cell.value === number
@@ -1386,7 +1981,7 @@ function placeNumber(number) {
 
 
     /*
-     * Enter number.
+     * Enter the number.
      */
     cell.candidates.clear();
 
@@ -1394,7 +1989,7 @@ function placeNumber(number) {
 
 
     /*
-     * Correct number becomes permanently locked.
+     * Correct number.
      */
     if (
         number === solution[selected]
@@ -1409,13 +2004,16 @@ function placeNumber(number) {
         );
 
 
+        refreshCompletedNumbers();
+
+
         checkWin();
 
 
     } else {
 
         /*
-         * Incorrect number remains editable.
+         * Incorrect number stays editable.
          */
         mistakes++;
 
@@ -1444,6 +2042,7 @@ function eraseSelected() {
         selected === -1 ||
         gameFinished
     ) {
+
         return;
     }
 
@@ -1452,12 +2051,31 @@ function eraseSelected() {
         cells[selected];
 
 
+    /*
+     * Correct / given numbers cannot be erased.
+     */
     if (
         cell.locked ||
         cell.given
     ) {
+
         return;
     }
+
+
+    /*
+     * Nothing to erase.
+     */
+    if (
+        cell.value === 0 &&
+        cell.candidates.size === 0
+    ) {
+
+        return;
+    }
+
+
+    pushHistory();
 
 
     cell.value = 0;
@@ -1492,9 +2110,13 @@ function checkWin() {
     messageElement.textContent =
         "Puzzle solved!";
 
-
     messageElement.className =
         "message success";
+
+
+    showSolvedModal();
+
+    updateBoard();
 
 
     return true;
@@ -1513,7 +2135,9 @@ function checkBoard() {
             cells[i];
 
 
-        if (cell.value === 0) {
+        if (
+            cell.value === 0
+        ) {
 
             incomplete++;
 
@@ -1537,7 +2161,6 @@ function checkBoard() {
                 ? "There is 1 incorrect number."
                 : `There are ${incorrect} incorrect numbers.`;
 
-
         messageElement.className =
             "message error";
 
@@ -1547,7 +2170,6 @@ function checkBoard() {
         messageElement.textContent =
             `${incomplete} cells remaining.`;
 
-
         messageElement.className =
             "message";
 
@@ -1556,6 +2178,41 @@ function checkBoard() {
 
         checkWin();
     }
+}
+
+
+/* -----------------------------------------------------------
+   Solved popup
+----------------------------------------------------------- */
+
+function showSolvedModal() {
+
+    solvedModal.classList.remove(
+        "hidden"
+    );
+
+
+    solvedModal.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+
+    closeSolvedButton.focus();
+}
+
+
+function hideSolvedModal() {
+
+    solvedModal.classList.add(
+        "hidden"
+    );
+
+
+    solvedModal.setAttribute(
+        "aria-hidden",
+        "true"
+    );
 }
 
 
@@ -1571,6 +2228,11 @@ function newGame() {
 
     mistakes = 0;
 
+    history = [];
+
+    currentDifficulty =
+        difficulty;
+
 
     mistakesElement.textContent =
         "Mistakes: 0";
@@ -1583,14 +2245,17 @@ function newGame() {
 
     messageElement.textContent = "";
 
-
     messageElement.className =
         "message";
 
 
     statusElement.textContent =
-        difficulty.charAt(0).toUpperCase() +
-        difficulty.slice(1);
+        difficultyName(
+            currentDifficulty
+        );
+
+
+    hideSolvedModal();
 
 
     generatePuzzle();
@@ -1598,6 +2263,8 @@ function newGame() {
     createCells();
 
     renderBoard();
+
+    updateUndoButton();
 }
 
 
@@ -1620,9 +2287,6 @@ normalModeButton.addEventListener(
         candidateModeButton.classList.remove(
             "active"
         );
-
-
-        updateBoard();
     }
 );
 
@@ -1642,9 +2306,62 @@ candidateModeButton.addEventListener(
         normalModeButton.classList.remove(
             "active"
         );
+    }
+);
 
 
-        updateBoard();
+/* -----------------------------------------------------------
+   Undo / buttons
+----------------------------------------------------------- */
+
+undoButton.addEventListener(
+    "click",
+    undo
+);
+
+
+newGameButton.addEventListener(
+    "click",
+    newGame
+);
+
+
+document
+    .getElementById("erase")
+    .addEventListener(
+        "click",
+        eraseSelected
+    );
+
+
+document
+    .getElementById("check")
+    .addEventListener(
+        "click",
+        checkBoard
+    );
+
+
+closeSolvedButton.addEventListener(
+    "click",
+    hideSolvedModal
+);
+
+
+/*
+ * Clicking the dark background also closes
+ * the solved popup.
+ */
+solvedModal.addEventListener(
+    "click",
+    event => {
+
+        if (
+            event.target === solvedModal
+        ) {
+
+            hideSolvedModal();
+        }
     }
 );
 
@@ -1683,14 +2400,23 @@ document
                 );
 
 
-                newGame();
+                /*
+                 * IMPORTANT:
+                 *
+                 * Selecting a difficulty does NOT
+                 * start a new game.
+                 *
+                 * It only changes the difficulty
+                 * that will be used the next time
+                 * New Game is pressed.
+                 */
             }
         );
     });
 
 
 /* -----------------------------------------------------------
-   Number pad
+   Number keypad
 ----------------------------------------------------------- */
 
 for (let n = 1; n <= 9; n++) {
@@ -1700,7 +2426,6 @@ for (let n = 1; n <= 9; n++) {
 
 
     button.textContent = n;
-
 
     button.dataset.number = n;
 
@@ -1714,36 +2439,10 @@ for (let n = 1; n <= 9; n++) {
     );
 
 
-    numberPad.appendChild(button);
+    numberPad.appendChild(
+        button
+    );
 }
-
-
-/* -----------------------------------------------------------
-   Buttons
------------------------------------------------------------ */
-
-document
-    .getElementById("erase")
-    .addEventListener(
-        "click",
-        eraseSelected
-    );
-
-
-document
-    .getElementById("newGame")
-    .addEventListener(
-        "click",
-        newGame
-    );
-
-
-document
-    .getElementById("check")
-    .addEventListener(
-        "click",
-        checkBoard
-    );
 
 
 /* -----------------------------------------------------------
@@ -1754,13 +2453,33 @@ document.addEventListener(
     "keydown",
     event => {
 
+        /*
+         * Escape closes the solved popup.
+         */
+        if (
+            event.key === "Escape" &&
+            !solvedModal.classList.contains(
+                "hidden"
+            )
+        ) {
+
+            hideSolvedModal();
+
+            return;
+        }
+
+
+        /*
+         * Prevent normal gameplay input
+         * after the puzzle is solved.
+         */
         if (gameFinished) {
             return;
         }
 
 
         /*
-         * Number keys
+         * Number keys.
          */
         if (
             event.key >= "1" &&
@@ -1776,7 +2495,7 @@ document.addEventListener(
 
 
         /*
-         * Erase
+         * Erase.
          */
         if (
             event.key === "Backspace" ||
@@ -1785,6 +2504,27 @@ document.addEventListener(
         ) {
 
             eraseSelected();
+
+            return;
+        }
+
+
+        /*
+         * Undo.
+         */
+        if (
+            event.ctrlKey ||
+            event.metaKey
+        ) {
+
+            if (
+                event.key.toLowerCase() === "z"
+            ) {
+
+                event.preventDefault();
+
+                undo();
+            }
 
             return;
         }
@@ -1864,7 +2604,7 @@ document.addEventListener(
 
 
 /* -----------------------------------------------------------
-   Start game
+   Start
 ----------------------------------------------------------- */
 
 newGame();
